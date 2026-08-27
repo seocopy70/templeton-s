@@ -1,0 +1,77 @@
+# ============================================
+# Templeton S - .gitignore
+# 절대 커밋 금지: API 키가 담긴 실제 환경파일
+# ============================================
+
+# --- 🔴 최우선: 비밀키/환경설정 ---
+config/.env
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+credentials*.json
+
+# --- Python 실행 산출물 ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# --- 가상환경 ---
+venv/
+.venv/
+env/
+ENV/
+
+# --- Streamlit ---
+.streamlit/secrets.toml
+
+# --- 데이터베이스 (향후 판단 기록 저장용) ---
+*.db
+*.sqlite
+*.sqlite3
+
+# --- 로그 / 캐시 ---
+logs/
+*.log
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Jupyter 노트북 산출물 (실험용) ---
+.ipynb_checkpoints/
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- OS 별 잔여물 ---
+# Windows
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+# macOS
+.DS_Store
+._*
+# Linux
+*~
+
+# --- 배포/빌드 도구 ---
+.pyproject_cache/
+node_modules/
+
+# 판단 기록 / 로컬 데이터
+data/decisions.jsonl
+data/*.jsonl
