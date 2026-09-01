@@ -14,6 +14,9 @@ from ai_interpreter import get_coach, build_change_conditions
 from decision_log import log_decision, recent_decisions, decisions_as_table_rows
 from events.dart_client import DartClient
 from events.trigger import should_refetch_events, trigger_reason
+from regime.market_regime import detect_market_regime
+from regime.panic_classifier import classify_stock_panic
+from regime.opportunity_rank import rank_opportunities
 
 # ── 페이지 설정 ──────────────────────────────────
 st.set_page_config(
@@ -45,7 +48,7 @@ for code, name in SYMBOLS.items():
         WATCHLIST.append((name, code))
 
 SCORE_VERSION = "v0.5"
-APP_PHASE = "Phase 4.5"
+APP_PHASE = "Phase 5-R"
 
 # ── 헬퍼 함수 ────────────────────────────────────
 def fmt_price(price) -> str:
@@ -128,6 +131,10 @@ def collect_data():
             "current_price": 0,
             "change_rate": 0.0,
         }
+    try:
+        benchmark_closes = client.get_daily_closes(MARKET_BENCHMARK_SYMBOL, 10)
+    except Exception:
+        benchmark_closes = []
 
     for name, code in WATCHLIST:
         try:
@@ -227,18 +234,6 @@ def collect_data():
                 if isinstance(ev, dict) and ev.get("event_id")
             ]
 
-            try:
-                log_decision(
-                    symbol=code,
-                    name=name,
-                    score_data=score_data,
-                    price=price.get("current_price"),
-                    event_ids=event_ids,
-                    event_trigger=reason if need_events else "none",
-                )
-            except Exception:
-                pass
-
             results.append({
                 "name": name,
                 "code": code,
@@ -260,7 +255,7 @@ def collect_data():
                 "ok": False,
             })
 
-    return results, benchmark
+    return results, benchmark, benchmark_closes
 
 # ── 카드 렌더링 함수 (호출 전에 정의) ─────────────
 def _render_stock_card(r, market_ctx_text, show_score, show_raw):
@@ -329,6 +324,12 @@ def _render_stock_card(r, market_ctx_text, show_score, show_raw):
             )
         n_ev = len(r.get("events") or [])
         ev_badge = f" · 공시 {n_ev}건" if n_ev else ""
+        pc = r.get("panic_class") or {}
+        panic_badge = ""
+        if pc.get("type") and pc.get("type") not in ("none",):
+            panic_badge = f" · <span style=\"color:#b45309;\">{pc.get('label_ko', '')}</span>"
+        if r.get("opportunity_rank"):
+            panic_badge += f" · 검토순위 {r.get('opportunity_rank')}"
 
         st.markdown(
             f"""
@@ -338,7 +339,7 @@ def _render_stock_card(r, market_ctx_text, show_score, show_raw):
                 font-size:0.85em;
                 margin-bottom:12px;
             ">
-                {code} · {ctx.get('signal', '—')}{trigger_badge}{ev_badge}
+                {code} · {ctx.get('signal', '—')}{trigger_badge}{ev_badge}{panic_badge}
             </div>
             """,
             unsafe_allow_html=True,
@@ -472,6 +473,7 @@ with st.sidebar:
     st.caption("Risk: 일봉 변동성 연율화")
     st.caption("Quality: ROE/부채 · Growth: 성장률")
     st.caption("Phase 4: DART 공시 " + ("ON" if DART_API_KEY else "OFF"))
+    st.caption("Phase 5-R: 시장모드·기회순위")
     st.markdown("---")
     if st.button("🔄 지금 새로고침", use_container_width=True):
         st.cache_data.clear()
@@ -498,7 +500,7 @@ if _missing_keys:
 elif KIS_ENV == "real":
     st.caption("⚠️ 실전(KIS_ENV=real) 모드입니다. Cloud에서는 IP 허용 여부를 확인하세요.")
 
-results, benchmark = collect_data()
+results, benchmark, benchmark_closes = collect_data()
 
 # 평시에도 캐시된 DART 공시를 카드/로그 보강용으로 병합 (트리거로 이미 넣은 경우 유지)
 try:
@@ -518,6 +520,53 @@ for r in results:
 ok_results = [r for r in results if r["ok"]]
 benchmark_chg = benchmark.get("change_rate", 0.0)
 
+# ── Phase 5-R: 시장 모드 · 공황 분류 · 기회 순위 ──
+_day_changes = [r["price_data"].get("change_rate") for r in ok_results]
+_regime = detect_market_regime(
+    benchmark_closes,
+    _day_changes,
+    benchmark_day_change=benchmark_chg,
+)
+for r in ok_results:
+    r["panic_class"] = classify_stock_panic(
+        market_regime=_regime.regime,
+        change_rate=r["price_data"].get("change_rate"),
+        market_change=benchmark_chg,
+        events=r.get("events") or [],
+    )
+_ranked = rank_opportunities(ok_results)
+_rank_map = {x["code"]: x for x in _ranked}
+for r in ok_results:
+    rr = _rank_map.get(r["code"])
+    if rr:
+        r["opportunity_rank"] = rr.get("opportunity_rank")
+        r["opportunity_score"] = rr.get("opportunity_score")
+    else:
+        r["opportunity_rank"] = None
+        r["opportunity_score"] = None
+
+# 판단 기록 (중복 억제 포함, 모드·순위 저장)
+for r in ok_results:
+    try:
+        log_decision(
+            symbol=r["code"],
+            name=r["name"],
+            score_data=r["score_data"],
+            price=r["price_data"].get("current_price"),
+            event_ids=[
+                str(ev.get("event_id"))
+                for ev in (r.get("events") or [])
+                if isinstance(ev, dict) and ev.get("event_id")
+            ],
+            event_trigger=r.get("event_trigger") or "none",
+            market_regime=_regime.regime,
+            panic_type=(r.get("panic_class") or {}).get("type"),
+            opportunity_rank=r.get("opportunity_rank"),
+            opportunity_score=r.get("opportunity_score"),
+        )
+    except Exception:
+        pass
+
 scores = [r["score_data"]["total"] for r in ok_results]
 avg_score = sum(scores) / len(scores) if scores else 0
 up_count = sum(1 for r in ok_results if r["price_data"].get("change_rate", 0) > 0)
@@ -528,6 +577,59 @@ col1.metric("조회 종목", f"{len(ok_results)} / {len(results)}")
 col2.metric("평균 Score", f"{avg_score:.1f}")
 col3.metric("상승 종목", f"{up_count}개")
 col4.metric("하락 종목", f"{down_count}개")
+
+# 시장 모드 배지
+_reg_colors = {
+    "normal": "#64748b",
+    "watch": "#ca8a04",
+    "panic_zone": "#dc2626",
+}
+_rc = _reg_colors.get(_regime.regime, "#64748b")
+st.markdown(
+    f"""
+    <div style="margin:12px 0; padding:12px 16px; border-radius:10px;
+                border-left:5px solid {_rc}; background:#f8fafc;">
+      <div style="font-size:0.85rem; color:#64748b;">시장 모드 (2~3일 관찰 후 확정 · 급매수 권유 없음)</div>
+      <div style="font-size:1.25rem; font-weight:700; color:{_rc};">{_regime.label_ko}</div>
+      <div style="font-size:0.9rem; color:#334155; margin-top:6px;">
+        1일 {_regime.bench_1d if _regime.bench_1d is not None else '—'}%
+        · 2일 {_regime.bench_2d if _regime.bench_2d is not None else '—'}%
+        · 3일 {_regime.bench_3d if _regime.bench_3d is not None else '—'}%
+        · 관심종목 하락비율 {f'{_regime.down_ratio:.0%}' if _regime.down_ratio is not None else '—'}
+      </div>
+      <div style="font-size:0.85rem; color:#64748b; margin-top:4px;">
+        {" · ".join(_regime.reasons[:3])}
+      </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+if _regime.regime in ("watch", "panic_zone"):
+    with st.expander(
+        "📉 가치 기준 검토 순위 (분할매수 검토 후보 · 자동매수 아님)",
+        expanded=(_regime.regime == "panic_zone"),
+    ):
+        st.caption(
+            "공포 구간에서는 서두르지 않습니다. "
+            "가치·품질·낙폭·공시 분류를 종합한 검토 순서입니다."
+        )
+        opp_rows = []
+        for item in _ranked:
+            pc = item.get("panic_class") or {}
+            opp_rows.append({
+                "순위": item.get("opportunity_rank"),
+                "종목": item.get("name"),
+                "기회점수": item.get("opportunity_score"),
+                "분류": pc.get("label_ko") or "—",
+                "Score": round((item.get("score_data") or {}).get("total") or 0, 1),
+                "의견": (item.get("score_data") or {}).get("opinion") or "—",
+                "등락률": f"{(item.get('price_data') or {}).get('change_rate', 0):+.2f}%",
+            })
+        if opp_rows:
+            st.dataframe(pd.DataFrame(opp_rows), use_container_width=True, hide_index=True)
+        else:
+            st.info("순위 산출할 종목 없음")
 
 st.markdown("---")
 st.markdown("## 📋 관심 종목 현황")

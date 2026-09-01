@@ -101,6 +101,10 @@ def log_decision(
     event_ids: Optional[list[str]] = None,
     event_trigger: Optional[str] = None,
     force: bool = False,
+    market_regime: Optional[str] = None,
+    panic_type: Optional[str] = None,
+    opportunity_rank: Optional[int] = None,
+    opportunity_score: Optional[float] = None,
 ) -> bool:
     """
     조건에 맞을 때만 기록. 기록했으면 True, 스킵이면 False.
@@ -127,6 +131,10 @@ def log_decision(
             "growth_method": (score_data.get("growth_inputs") or {}).get("method"),
             "event_ids": list(event_ids) if event_ids else [],
             "event_trigger": event_trigger or "none",
+            "market_regime": market_regime or "normal",
+            "panic_type": panic_type or "none",
+            "opportunity_rank": opportunity_rank,
+            "opportunity_score": opportunity_score,
         }
         if extra:
             record["extra"] = extra
@@ -201,6 +209,9 @@ def decisions_as_table_rows(records: list[dict]) -> list[dict]:
             "의견": r.get("opinion") or "—",
             "비관신호": r.get("pessimism_signal") or "—",
             "트리거": r.get("event_trigger") or "—",
+            "시장모드": r.get("market_regime") or "—",
+            "공황분류": r.get("panic_type") or "—",
+            "기회순위": r.get("opportunity_rank") if r.get("opportunity_rank") is not None else "—",
             "event_ids": eid_str,
         })
     return rows
