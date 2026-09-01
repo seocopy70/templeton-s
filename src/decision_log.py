@@ -1,7 +1,8 @@
 """
-판단 기록 (Phase 6 초안)
-Score + 의견 + event_ids 를 JSONL로 저장.
+판단 기록 (Phase 4.5+ / Phase 6 연동)
+Score + 의견 + event_ids + regime/rank 를 JSONL로 저장.
 동일 종목의 중복 기록은 억제한다.
+사후 검증(1주/1개월 수익)은 post_verify.py 가 담당.
 """
 from __future__ import annotations
 

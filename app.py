@@ -18,6 +18,7 @@ from regime.market_regime import detect_market_regime
 from regime.panic_classifier import classify_stock_panic
 from regime.opportunity_rank import rank_opportunities
 from market_overview import fetch_market_overview
+from post_verify import load_and_verify, verified_table_rows
 
 # ── 페이지 설정 ──────────────────────────────────
 st.set_page_config(
@@ -49,7 +50,7 @@ for code, name in SYMBOLS.items():
         WATCHLIST.append((name, code))
 
 SCORE_VERSION = "v0.5"
-APP_PHASE = "Phase 5-R"
+APP_PHASE = "Phase 6"
 
 # ── 헬퍼 함수 ────────────────────────────────────
 def fmt_price(price) -> str:
@@ -485,6 +486,7 @@ with st.sidebar:
     st.caption("Quality: ROE/부채 · Growth: 성장률")
     st.caption("Phase 4: DART 공시 " + ("ON" if DART_API_KEY else "OFF"))
     st.caption("Phase 5-R: 시장모드·기회순위")
+    st.caption("Phase 6: 사후 검증(1주/1개월)")
     st.markdown("---")
     if st.button("🔄 지금 새로고침", use_container_width=True):
         st.cache_data.clear()
@@ -731,7 +733,7 @@ if failed:
             with st.popover("원본 오류"):
                 st.code(r.get("error") or "—")
 
-# ── 판단 기록 (Phase 6 초안 UI) ───────────────────
+# ── 판단 기록 + Phase 6 사후 검증 ─────────────────
 st.markdown("---")
 st.markdown("## 📰 최근 공시 (DART)")
 if not DART_API_KEY:
@@ -775,6 +777,57 @@ else:
     hist_df = pd.DataFrame(decisions_as_table_rows(records))
     st.dataframe(hist_df, use_container_width=True, hide_index=True)
     st.caption(f"총 {len(records)}건 표시 · 저장 위치: data/decisions.jsonl")
+
+# ── Phase 6: 사후 검증 ────────────────────────────
+st.markdown("---")
+st.markdown("## 📈 사후 검증 (1주 / 1개월)")
+st.caption(
+    "기록 시점 가격 대비 이후 약 5거래일·20거래일 수익률입니다. "
+    "자동매수 없음 · 검증은 사후 참고용 · 표본이 쌓여야 의미가 있습니다."
+)
+
+run_verify = st.checkbox("사후 검증 실행 (일봉 조회)", value=False, key="run_post_verify")
+if not records:
+    st.info("판단 기록이 없어 검증할 대상이 없습니다.")
+elif not run_verify:
+    st.caption("체크하면 종목별 일봉을 조회해 1주·1개월 수익을 계산합니다.")
+else:
+    try:
+        try:
+            _client = client  # 상단에서 생성된 KISClient 재사용
+        except NameError:
+            _client = KISClient()
+
+        with st.spinner("일봉 조회 및 수익률 계산 중…"):
+            verified, summary = load_and_verify(
+                _client, limit=hist_limit, symbol=filter_code
+            )
+
+        if summary:
+            st.markdown("#### 의견별 요약")
+            sum_df = pd.DataFrame(summary)
+            st.dataframe(sum_df, use_container_width=True, hide_index=True)
+            st.caption(
+                "히트율: 긍정 의견은 수익>0, 매수 회피는 수익<0일 때 히트. "
+                "관망·보유/관찰은 히트율 분모에서 제외."
+            )
+        else:
+            st.info("요약할 검증 데이터가 없습니다.")
+
+        if verified:
+            st.markdown("#### 개별 기록 + 선도 수익")
+            v_df = pd.DataFrame(verified_table_rows(verified))
+            st.dataframe(v_df, use_container_width=True, hide_index=True)
+            n_ok = sum(1 for r in verified if r.get("verify_status") == "ok")
+            n_wait = sum(1 for r in verified if r.get("verify_status") == "waiting")
+            st.caption(
+                f"검증됨 {n_ok}건 · 기간 대기 {n_wait}건 · "
+                f"1주≈5거래일, 1개월≈20거래일"
+            )
+    except Exception as e:
+        st.error(f"사후 검증 실패: {humanize_error(str(e))}")
+        with st.popover("원본 오류"):
+            st.code(str(e))
 
 st.markdown("---")
 st.caption(

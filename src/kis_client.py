@@ -511,6 +511,85 @@ class KISClient:
 
         return closes[:count]
 
+    def get_daily_bars(
+        self,
+        symbol: str,
+        count: int = 120,
+    ) -> list[dict[str, Any]]:
+        """
+        일봉 (날짜 + 종가) 목록. 최신 → 과거 순.
+
+        Returns:
+            [{"date": "YYYY-MM-DD", "close": float}, ...]
+        Phase 6 사후 검증·과거 시뮬레이션용.
+        """
+        token = self._get_token()
+
+        url = (
+            f"{self.base_url}"
+            "/uapi/domestic-stock/v1/quotations/"
+            "inquire-daily-itemchartprice"
+        )
+
+        headers = {
+            "content-type": "application/json; charset=utf-8",
+            "authorization": f"Bearer {token}",
+            "appkey": self.app_key,
+            "appsecret": self.app_secret,
+            "tr_id": "FHKST03010100",
+            "custtype": "P",
+        }
+
+        end_date = datetime.now().date()
+        # 넉넉히 조회 (거래일 기준 count보다 여유)
+        start_date = end_date - timedelta(days=max(300, count * 2))
+
+        params = {
+            "FID_COND_MRKT_DIV_CODE": "J",
+            "FID_INPUT_ISCD": symbol,
+            "FID_INPUT_DATE_1": start_date.strftime("%Y%m%d"),
+            "FID_INPUT_DATE_2": end_date.strftime("%Y%m%d"),
+            "FID_PERIOD_DIV_CODE": "D",
+            "FID_ORG_ADJ_PRC": "0",
+        }
+
+        resp = self._request_with_retry(
+            url,
+            headers=headers,
+            params=params,
+        )
+        self._raise_detail(resp)
+        data = self._parse_json(resp, f"일봉바 조회({symbol})")
+
+        if data.get("rt_cd") != "0":
+            raise RuntimeError(
+                f"KIS API 오류: {data.get('msg1')} "
+                f"(rt_cd={data.get('rt_cd')})"
+            )
+
+        rows = data.get("output2") or []
+
+        def _row_date(row):
+            d = row.get("stck_bsop_date") or row.get("date") or ""
+            return str(d)
+
+        rows = sorted(rows, key=_row_date, reverse=True)
+
+        bars: list[dict[str, Any]] = []
+        for row in rows:
+            raw = _row_date(row)
+            if len(raw) != 8 or not raw.isdigit():
+                continue
+            c = self._to_float(row.get("stck_clpr"))
+            if c is None or c <= 0:
+                continue
+            bars.append({
+                "date": f"{raw[:4]}-{raw[4:6]}-{raw[6:8]}",
+                "close": c,
+            })
+
+        return bars[:count]
+
     # -------------------------------------------------------------
     # 변환 유틸
     # -------------------------------------------------------------
