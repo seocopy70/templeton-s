@@ -5,7 +5,8 @@
 - Phase 0 완료: 투자철학 / Rules v0.1 / 6종목 확정 / Score 설계 / 데이터 스키마
 - Phase 1 완료: KIS Open API 연동 + 6종목 현재가 수집
 - Phase 2 완료: Templeton Score v0.5 (Value/Pessimism/Risk/Quality/Growth)
-- Phase 3 진행: AI 해석 + 판단 기록
+- Phase 3 진행: AI 해석 + 판단 기록 UI
+- Phase 4 초안: DART 공시 설계·골격·대시보드 섹션
 - Streamlit 웹 대시보드
 
 ## 확정 6종목
@@ -55,6 +56,7 @@ streamlit run app.py
 - `docs/Data_Schema_v0.1.md`
 - `docs/Templeton_Score_Calculation_v0.1.md`
 - `docs/KIS_API_Guide.md`
+- `docs/Phase4_News_Disclosure_Design_v0.1.md`
 
 ## 원칙 요약
 - AI는 참모, 최종 결정은 사용자

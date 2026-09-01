@@ -38,11 +38,43 @@ def _get_comp(components: Dict, key: str, default: float = 50.0) -> float:
     return default
 
 
+def _format_events_block(events: Optional[list]) -> str:
+    """AI 프롬프트/폴백용 공시 요약 텍스트."""
+    if not events:
+        return "관련 공시 없음 (또는 미조회)"
+    lines = []
+    for ev in events[:5]:
+        if not isinstance(ev, dict):
+            continue
+        title = ev.get("title") or "—"
+        imp = ev.get("importance") or "low"
+        cat = ev.get("category") or "other"
+        sent = ev.get("sentiment") or "neutral"
+        impact = ev.get("value_impact") or "unlikely"
+        ts = ev.get("ts") or ""
+        lines.append(f"- [{ts}] ({imp}/{cat}/{sent}, 가치영향:{impact}) {title}")
+    return "\n".join(lines) if lines else "관련 공시 없음"
+
+
+def _events_note_for_fallback(events: Optional[list]) -> str:
+    if not events:
+        return ""
+    high = [
+        ev for ev in events
+        if isinstance(ev, dict) and ev.get("importance") in ("high", "critical")
+    ]
+    if not high:
+        return f" 최근 공시 {len(events)}건이 있으나 중요도 high 이상은 없습니다."
+    titles = ", ".join((ev.get("title") or "")[:40] for ev in high[:2])
+    return f" 급락/이벤트 트리거와 함께 주요 공시가 있습니다: {titles}."
+
+
 # ── 규칙 기반 해석 (폴백) ────────────────────────
 def _build_fallback_comment(
     name: str,
     score_data: Dict,
     opinion: str,
+    events: Optional[list] = None,
 ) -> Dict:
     components = score_data.get("components", {})
     total = score_data.get("total", 0)
@@ -92,6 +124,19 @@ def _build_fallback_comment(
             f"긍정 요인({pos_text})과 "
             f"부정 요인({neg_text})이 혼재된 결과입니다."
         )
+
+    comment = comment + _events_note_for_fallback(events)
+
+    # 중요 공시가 있으면 부정/주의 요인에 한 줄 추가
+    if events:
+        for ev in events:
+            if not isinstance(ev, dict):
+                continue
+            if ev.get("importance") in ("high", "critical"):
+                neg_line = f"공시({ev.get('importance')}): {(ev.get('title') or '')[:50]}"
+                if neg_line not in negatives:
+                    negatives.append(neg_line)
+                break
 
     counter_argument = _build_counter_argument(name, components)
 
@@ -186,15 +231,16 @@ class AICoach:
         score_data: Dict,
         opinion: str,
         market_ctx: Optional[str] = None,
+        events: Optional[list] = None,
     ) -> Dict:
         if not self.client:
-            return _build_fallback_comment(name, score_data, opinion)
+            return _build_fallback_comment(name, score_data, opinion, events=events)
 
         try:
-            return self._call_groq(name, code, score_data, opinion, market_ctx)
+            return self._call_groq(name, code, score_data, opinion, market_ctx, events=events)
         except Exception as e:
             print(f"⚠️ AI 코멘트 실패 ({name}): {e} — 규칙 기반 사용")
-            return _build_fallback_comment(name, score_data, opinion)
+            return _build_fallback_comment(name, score_data, opinion, events=events)
 
     def _call_groq(
         self,
@@ -203,6 +249,7 @@ class AICoach:
         score_data: Dict,
         opinion: str,
         market_ctx: Optional[str],
+        events: Optional[list] = None,
     ) -> Dict:
         components = score_data.get("components", {})
         total = score_data.get("total", 0)
@@ -213,9 +260,11 @@ class AICoach:
         quality = _get_comp(components, "quality")
         risk = _get_comp(components, "risk")
         growth = _get_comp(components, "growth")
+        events_block = _format_events_block(events)
 
         prompt = f"""당신은 존 템플턴의 가치투자 원칙을 따르는 신중한 투자 코치입니다.
 과도한 확신이나 매수 권유는 피하고, 항상 근거와 반대 근거를 함께 제시합니다.
+공시가 있으면 가격 움직임이 공시·개별 이슈인지 시장 공포인지 구분해 설명하세요.
 
 [종목 정보]
 - 이름: {name} ({code})
@@ -232,6 +281,9 @@ class AICoach:
 
 [시장 상황]
 {market_ctx or "특이사항 없음"}
+
+[관련 공시·이벤트]
+{events_block}
 
 [출력 형식 — 반드시 준수]
 COMMENT: (2~3문장 종합 코멘트)

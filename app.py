@@ -9,9 +9,11 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from kis_client import KISClient
 from market_data import compute_volatility, compute_momentum
 from score_engine import calculate_templeton_score, MARKET_BENCHMARK_SYMBOL
-from config import KIS_APP_KEY, KIS_APP_SECRET, KIS_ENV, SYMBOLS
+from config import KIS_APP_KEY, KIS_APP_SECRET, KIS_ENV, SYMBOLS, DART_API_KEY
 from ai_interpreter import get_coach, build_change_conditions
-from decision_log import log_decision
+from decision_log import log_decision, recent_decisions, decisions_as_table_rows
+from events.dart_client import DartClient
+from events.trigger import should_refetch_events, trigger_reason
 
 # ── 페이지 설정 ──────────────────────────────────
 st.set_page_config(
@@ -43,7 +45,7 @@ for code, name in SYMBOLS.items():
         WATCHLIST.append((name, code))
 
 SCORE_VERSION = "v0.5"
-APP_PHASE = "Phase 3"
+APP_PHASE = "Phase 4.5"
 
 # ── 헬퍼 함수 ────────────────────────────────────
 def fmt_price(price) -> str:
@@ -53,6 +55,28 @@ def fmt_price(price) -> str:
         return f"{float(price):,.0f}원"
     except (TypeError, ValueError):
         return "—"
+
+
+
+def humanize_error(err: str) -> str:
+    """API/설정 오류를 사용자용 짧은 안내로 변환."""
+    e = (err or "").lower()
+    raw = err or "알 수 없는 오류"
+    if "kis_app_key" in e or "kis_app_secret" in e or "필수 환경변수" in e:
+        return "API 키가 없습니다. 로컬은 config/.env, 웹은 Streamlit Secrets에 KIS_APP_KEY / KIS_APP_SECRET을 넣으세요."
+    if "401" in e or "unauthorized" in e or "egw001" in e:
+        return "인증 실패(401). 키·시크릿이 맞는지, KIS_ENV(paper/real)와 앱키 종류가 일치하는지 확인하세요."
+    if "403" in e or "forbidden" in e or "ip" in e:
+        return "접근 거부(403/IP). KIS 포털에 접속 IP가 등록됐는지 확인하세요. Cloud 배포 시 IP가 달라질 수 있습니다."
+    if "timeout" in e or "timed out" in e:
+        return "응답 시간 초과. 네트워크 또는 KIS 서버 지연일 수 있습니다. 잠시 후 새로고침하세요."
+    if "500" in e or "502" in e or "503" in e:
+        return "KIS 서버 일시 오류. 잠시 후 다시 시도하세요."
+    if "json" in e and "아님" in raw:
+        return "KIS 응답이 비정상입니다. 점검 시간이거나 토큰 문제일 수 있습니다."
+    if len(raw) > 180:
+        return raw[:180] + "…"
+    return raw
 
 
 def opinion_emoji(opinion: str) -> str:
@@ -75,6 +99,22 @@ def opinion_color(opinion: str) -> str:
     }.get(opinion, "#6b7280")
 
 # ── 데이터 수집 ──────────────────────────────────
+@st.cache_data(ttl=600)
+def fetch_disclosures():
+    """DART 공시 (키 없으면 빈 dict). TTL 10분."""
+    client = DartClient(DART_API_KEY)
+    if not client.enabled:
+        return {}
+    out = {}
+    for name, code in WATCHLIST:
+        try:
+            events = client.get_recent_disclosures(code, name=name, days=45, max_count=5)
+            out[code] = [e.to_dict() for e in events]
+        except Exception as e:
+            out[code] = []
+    return out
+
+
 @st.cache_data(ttl=60)
 def collect_data():
     client = KISClient()
@@ -164,12 +204,37 @@ def collect_data():
                 "vs_52w_high": drop_from_52w_high,
             }
 
+            # ── Phase 4.4: 급락 트리거 → 공시 조회 ──
+            mkt_chg = benchmark.get("change_rate")
+            need_events = should_refetch_events(change, mkt_chg)
+            reason = trigger_reason(change, mkt_chg)
+            events_for_stock: list = []
+            if need_events and DART_API_KEY:
+                try:
+                    dart = DartClient(DART_API_KEY)
+                    events_for_stock = [
+                        e.to_dict()
+                        for e in dart.get_recent_disclosures(
+                            code, name=name, days=30, max_count=5
+                        )
+                    ]
+                except Exception:
+                    events_for_stock = []
+            # critical/high 공시는 트리거와 무관하게 캐시 맵에서 보강 (아래 메인에서 merge 가능)
+            event_ids = [
+                str(ev.get("event_id"))
+                for ev in events_for_stock
+                if isinstance(ev, dict) and ev.get("event_id")
+            ]
+
             try:
                 log_decision(
                     symbol=code,
                     name=name,
                     score_data=score_data,
                     price=price.get("current_price"),
+                    event_ids=event_ids,
+                    event_trigger=reason if need_events else "none",
                 )
             except Exception:
                 pass
@@ -180,6 +245,9 @@ def collect_data():
                 "price_data": price,
                 "closes": closes,
                 "score_data": score_data,
+                "events": events_for_stock,
+                "event_trigger": reason if need_events else "none",
+                "event_triggered": need_events,
                 "ok": True,
             })
 
@@ -188,6 +256,7 @@ def collect_data():
                 "name": name,
                 "code": code,
                 "error": str(e),
+                "error_user": humanize_error(str(e)),
                 "ok": False,
             })
 
@@ -205,6 +274,26 @@ def _render_stock_card(r, market_ctx_text, show_score, show_raw):
     opinion = s["opinion"]
     current_price = p.get("current_price", 0)
 
+    events = r.get("events") or []
+    event_triggered = bool(r.get("event_triggered"))
+    # 급락 트리거이거나 high/critical 공시가 있으면 AI에 공시 전달
+    events_for_ai = events if (
+        event_triggered
+        or any(
+            isinstance(ev, dict) and ev.get("importance") in ("high", "critical")
+            for ev in events
+        )
+    ) else events  # 트리거 아니어도 조회된 공시는 참고용 전달 (최대 활용)
+    # 정책: 트리거 시에만 강제 포함, 그 외에는 공시가 있으면 포함
+    if not event_triggered and not events:
+        events_for_ai = None
+    elif not event_triggered:
+        # 평시에도 medium 이상만 전달해 노이즈 감소
+        events_for_ai = [
+            ev for ev in events
+            if isinstance(ev, dict) and ev.get("importance") in ("medium", "high", "critical")
+        ] or None
+
     coach = get_coach()
     ai = coach.generate_comment(
         name=name,
@@ -212,6 +301,7 @@ def _render_stock_card(r, market_ctx_text, show_score, show_raw):
         score_data=s,
         opinion=opinion,
         market_ctx=market_ctx_text,
+        events=events_for_ai,
     )
 
     change_conds = build_change_conditions(
@@ -219,6 +309,11 @@ def _render_stock_card(r, market_ctx_text, show_score, show_raw):
         score_data=s,
         current_price=current_price,
     )
+    if event_triggered:
+        change_conds = [
+            f"이벤트 트리거 활성 ({r.get('event_trigger')}) — 공시·뉴스 재확인"
+        ] + change_conds
+        change_conds = change_conds[:5]
 
     color = opinion_color(opinion)
 
@@ -226,6 +321,15 @@ def _render_stock_card(r, market_ctx_text, show_score, show_raw):
     with st.container(border=True):
 
         # ── 종목명 / 코드 ───────────────────────────
+        trigger_badge = ""
+        if r.get("event_triggered"):
+            trigger_badge = (
+                f" · <span style=\"color:#dc2626;font-weight:600;\">"
+                f"⚡ 이벤트 트리거 {r.get('event_trigger', '')}</span>"
+            )
+        n_ev = len(r.get("events") or [])
+        ev_badge = f" · 공시 {n_ev}건" if n_ev else ""
+
         st.markdown(
             f"""
             <h3 style="margin:0 0 4px 0;">{name}</h3>
@@ -234,7 +338,7 @@ def _render_stock_card(r, market_ctx_text, show_score, show_raw):
                 font-size:0.85em;
                 margin-bottom:12px;
             ">
-                {code} · {ctx.get('signal', '—')}
+                {code} · {ctx.get('signal', '—')}{trigger_badge}{ev_badge}
             </div>
             """,
             unsafe_allow_html=True,
@@ -260,15 +364,18 @@ def _render_stock_card(r, market_ctx_text, show_score, show_raw):
 
         st.markdown(
             f"""
-            **의견**
-            <span style="color:{color}; font-weight:600;">
-            {opinion_emoji(opinion)} {opinion}
-            </span>
+            <div style="margin:8px 0 12px 0; padding:10px 12px; border-radius:8px;
+                        background:#f8fafc; border-left:4px solid {color};">
+              <div style="font-size:0.8rem; color:#64748b; margin-bottom:2px;">투자 의견 (AI는 참모)</div>
+              <div style="font-size:1.15rem; font-weight:700; color:{color};">
+                {opinion_emoji(opinion)} {opinion}
+              </div>
+            </div>
             """,
             unsafe_allow_html=True,
         )
 
-        # ── 밸류에이션 ────────────────────────────
+        # ── 밸류에이션 · 맥락 한 블록 ─────────────
         per = p.get("per")
         pbr = p.get("pbr")
         eps = p.get("eps")
@@ -276,19 +383,17 @@ def _render_stock_card(r, market_ctx_text, show_score, show_raw):
         per_str = f"{per:.1f}" if per else "—"
         pbr_str = f"{pbr:.2f}" if pbr else "—"
         eps_str = f"{eps:,.0f}" if eps else "—"
+        vs_m = ctx.get("vs_market")
+        vs_m_str = f"{vs_m:+.2f}%p" if isinstance(vs_m, (int, float)) else "—"
 
+        st.markdown("**근거 요약**")
         st.caption(
             f"PER {per_str} · PBR {pbr_str} · EPS {eps_str} · "
-            f"Value 근거: {ctx.get('value_label', '—')}"
+            f"Value `{ctx.get('value_label', '—')}`"
         )
-
         st.caption(
-            f"비관 신호: {ctx.get('pessimism_signal', '—')} · "
-            f"시장 대비 {ctx.get('vs_market', 0):+.2f}%p"
-        )
-
-        st.caption(
-            f"위험: {ctx.get('risk_label', '—')}"
+            f"비관 `{ctx.get('pessimism_signal', '—')}` · 시장 대비 {vs_m_str} · "
+            f"{ctx.get('risk_label', '—')}"
         )
 
         # ── Score 구성요소 그래프 ──────────────────
@@ -310,30 +415,40 @@ def _render_stock_card(r, market_ctx_text, show_score, show_raw):
         )
 
         # ── AI 투자 코멘트 ─────────────────────────
-        with st.expander("🤖 AI 투자 코멘트", expanded=False):
+        with st.expander("🤖 판단 상세 (근거 · 반대 · 변경 조건)", expanded=False):
 
-            st.info(ai["comment"])
+            st.markdown("##### 종합 코멘트")
+            st.info(ai.get("comment") or "—")
 
+            if events_for_ai:
+                st.markdown("##### 반영된 공시")
+                for ev in events_for_ai[:5]:
+                    if not isinstance(ev, dict):
+                        continue
+                    st.markdown(
+                        f"- `{ev.get('importance', '—')}` "
+                        f"{ev.get('title', '—')} "
+                        f"({ev.get('ts', '')})"
+                    )
+
+            st.markdown("##### 긍정 · 부정 요인")
             cp, cn = st.columns(2)
-
             with cp:
-                st.markdown("**✓ 긍정 요인**")
-                for x in ai.get("positives", []):
+                st.success("긍정")
+                for x in ai.get("positives", []) or ["—"]:
                     st.markdown(f"- {x}")
-
             with cn:
-                st.markdown("**✗ 부정 요인**")
-                for x in ai.get("negatives", []):
+                st.error("부정·주의")
+                for x in ai.get("negatives", []) or ["—"]:
                     st.markdown(f"- {x}")
 
-            st.markdown("**⚖️ 반대 근거**")
-            st.warning(
-                ai.get("counter_argument", "—")
-            )
+            st.markdown("##### 반대 근거 (왜 틀릴 수 있는가)")
+            st.warning(ai.get("counter_argument") or "—")
 
-            st.markdown("**🔄 판단 변경 조건**")
+            st.markdown("##### 이 판단을 바꿀 조건")
             for cond in change_conds:
                 st.markdown(f"- {cond}")
+            st.caption(f"해석 소스: {ai.get('source', '—')} · 최종 결정은 사용자")
 
         # ── 원본 데이터 ────────────────────────────
         if show_raw:
@@ -356,6 +471,7 @@ with st.sidebar:
     st.caption("Pessimism: 시장 대비 상태")
     st.caption("Risk: 일봉 변동성 연율화")
     st.caption("Quality: ROE/부채 · Growth: 성장률")
+    st.caption("Phase 4: DART 공시 " + ("ON" if DART_API_KEY else "OFF"))
     st.markdown("---")
     if st.button("🔄 지금 새로고침", use_container_width=True):
         st.cache_data.clear()
@@ -367,7 +483,38 @@ st.markdown("# 📊 TEMPLETON S")
 st.caption(f"개인 투자코치 · {APP_PHASE} · AI 해석 · Score {SCORE_VERSION} · 환경: **{KIS_ENV.upper()}**")
 st.caption("시장 벤치마크 KODEX 200 · 종목 하락의 성격(시장 전체 vs 개별)을 구분하는 기준")
 
+# 설정 점검 (웹 Secrets / 로컬 .env)
+_missing_keys = []
+if not KIS_APP_KEY:
+    _missing_keys.append("KIS_APP_KEY")
+if not KIS_APP_SECRET:
+    _missing_keys.append("KIS_APP_SECRET")
+if _missing_keys:
+    st.error(
+        "**필수 API 키가 없습니다:** "
+        + ", ".join(_missing_keys)
+        + "\n\n로컬: `config/.env` · 웹(Streamlit Cloud): **Settings → Secrets** (TOML, 값은 따옴표)"
+    )
+elif KIS_ENV == "real":
+    st.caption("⚠️ 실전(KIS_ENV=real) 모드입니다. Cloud에서는 IP 허용 여부를 확인하세요.")
+
 results, benchmark = collect_data()
+
+# 평시에도 캐시된 DART 공시를 카드/로그 보강용으로 병합 (트리거로 이미 넣은 경우 유지)
+try:
+    disc_map = fetch_disclosures() if DART_API_KEY else {}
+except Exception:
+    disc_map = {}
+for r in results:
+    if not r.get("ok"):
+        continue
+    if r.get("events"):
+        continue
+    cached = disc_map.get(r["code"]) or []
+    if cached:
+        r["events"] = cached
+        # 중요 공시만 있을 때 event_ids를 후행 기록하지는 않음 (중복 로그 방지)
+
 ok_results = [r for r in results if r["ok"]]
 benchmark_chg = benchmark.get("change_rate", 0.0)
 
@@ -425,9 +572,57 @@ for i in range(0, len(ok_results), 2):
 
 failed = [r for r in results if not r["ok"]]
 if failed:
-    with st.expander(f"⚠️ 조회 실패 종목 ({len(failed)}개)"):
+    st.warning(f"조회 실패 종목 {len(failed)}개 — 아래를 펼쳐 원인을 확인하세요.")
+    with st.expander(f"⚠️ 조회 실패 상세 ({len(failed)}개)", expanded=True):
         for r in failed:
-            st.error(f"**{r['name']}** ({r['code']}): {r.get('error', '—')}")
+            st.error(f"**{r['name']}** ({r['code']})\n\n{r.get('error_user') or humanize_error(r.get('error', '—'))}")
+            with st.popover("원본 오류"):
+                st.code(r.get("error") or "—")
+
+# ── 판단 기록 (Phase 6 초안 UI) ───────────────────
+st.markdown("---")
+st.markdown("## 📰 최근 공시 (DART)")
+if not DART_API_KEY:
+    st.caption("DART_API_KEY가 없어 공시 조회를 건너뜁니다. config/.env 에 키를 넣으면 활성화됩니다.")
+else:
+    disc_map = fetch_disclosures()
+    any_row = False
+    disc_rows = []
+    for name, code in WATCHLIST:
+        for ev in disc_map.get(code) or []:
+            any_row = True
+            disc_rows.append({
+                "종목": name,
+                "일자": ev.get("ts") or "—",
+                "제목": ev.get("title") or "—",
+                "분류": ev.get("category") or "—",
+                "중요도": ev.get("importance") or "—",
+                "가치영향": ev.get("value_impact") or "—",
+            })
+    if not any_row:
+        st.info("최근 공시 없음 또는 조회 결과 없음")
+    else:
+        st.dataframe(pd.DataFrame(disc_rows), use_container_width=True, hide_index=True)
+        st.caption("규칙 기반 분류(Phase 4.2 초안) · 상세는 DART 원문 확인")
+
+st.markdown("---")
+st.markdown("## 📜 최근 판단 기록")
+st.caption("Score·의견·트리거를 저장합니다. 의견/점수 변동·이벤트·6시간 경과 시에만 추가 기록합니다.")
+
+hist_limit = st.slider("표시 건수", min_value=10, max_value=100, value=30, step=10)
+symbol_options = ["전체"] + [f"{name} ({code})" for name, code in WATCHLIST]
+hist_filter = st.selectbox("종목 필터", symbol_options, index=0)
+filter_code = None
+if hist_filter != "전체":
+    filter_code = hist_filter.rsplit("(", 1)[-1].rstrip(")")
+
+records = recent_decisions(limit=hist_limit, symbol=filter_code)
+if not records:
+    st.info("아직 저장된 판단 기록이 없습니다. 새로고침하면 현재 조회 결과가 기록됩니다.")
+else:
+    hist_df = pd.DataFrame(decisions_as_table_rows(records))
+    st.dataframe(hist_df, use_container_width=True, hide_index=True)
+    st.caption(f"총 {len(records)}건 표시 · 저장 위치: data/decisions.jsonl")
 
 st.markdown("---")
 st.caption(

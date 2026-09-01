@@ -16,6 +16,8 @@ KIS_ACCOUNT_PRODUCT = os.getenv("KIS_ACCOUNT_PRODUCT", "01")
 
 POLL_INTERVAL_SEC = int(os.getenv("POLL_INTERVAL_SEC", "10"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+DART_API_KEY = os.getenv("DART_API_KEY", "")
+NEWS_ENABLED = os.getenv("NEWS_ENABLED", "false").lower() in ("1", "true", "yes")
 
 # Base URL
 if KIS_ENV == "real":
