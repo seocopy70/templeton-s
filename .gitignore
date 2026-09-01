@@ -72,6 +72,8 @@ $RECYCLE.BIN/
 .pyproject_cache/
 node_modules/
 
-# 판단 기록 / 로컬 데이터
-data/decisions.jsonl
-data/*.jsonl
+# 로컬 데이터 기본 무시 — 공식 일일 판단 로그만 추적 (GitHub Actions 적재)
+data/*
+!data/.gitkeep
+!data/decisions.jsonl
+!data/decisions_*.jsonl
