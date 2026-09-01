@@ -522,9 +522,7 @@ if _markets and not (len(_markets) == 1 and _markets[0].get("key") == "error"):
             closes = m.get("closes") or []
             if len(closes) < 2:
                 continue
-            df = pd.DataFrame({"종가": closes})  # noqa
-            if False:
-                df = pd.DataFrame({"종가": closes})
+            df = pd.DataFrame({"종가": closes})
             with chart_cols[plotted % len(chart_cols)]:
                 st.caption(m.get("name") or m.get("key"))
                 st.line_chart(df, height=180)
