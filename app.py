@@ -17,6 +17,7 @@ from events.trigger import should_refetch_events, trigger_reason
 from regime.market_regime import detect_market_regime
 from regime.panic_classifier import classify_stock_panic
 from regime.opportunity_rank import rank_opportunities
+from market_overview import fetch_market_overview
 
 # ── 페이지 설정 ──────────────────────────────────
 st.set_page_config(
@@ -116,6 +117,16 @@ def fetch_disclosures():
         except Exception as e:
             out[code] = []
     return out
+
+
+@st.cache_data(ttl=120)
+def fetch_markets():
+    """한·미·일 주요 지수/대용. TTL 2분."""
+    try:
+        return fetch_market_overview(KISClient())
+    except Exception as e:
+        return [{"key": "error", "name": "시장요약", "ok": False, "error": str(e),
+                 "price": None, "change_rate": None, "closes": [], "region": ""}]
 
 
 @st.cache_data(ttl=60)
@@ -484,6 +495,47 @@ with st.sidebar:
 st.markdown("# 📊 TEMPLETON S")
 st.caption(f"개인 투자코치 · {APP_PHASE} · AI 해석 · Score {SCORE_VERSION} · 환경: **{KIS_ENV.upper()}**")
 st.caption("시장 벤치마크 KODEX 200 · 종목 하락의 성격(시장 전체 vs 개별)을 구분하는 기준")
+
+# ── 주요 시장 요약 (한·미·일) ─────────────────────
+_markets = fetch_markets()
+if _markets and not (len(_markets) == 1 and _markets[0].get("key") == "error"):
+    mcols = st.columns(len(_markets))
+    for col, m in zip(mcols, _markets):
+        with col:
+            chg = m.get("change_rate")
+            price = m.get("price")
+            if m.get("ok") and price is not None:
+                delta = f"{chg:+.2f}%" if chg is not None else None
+                # 지수는 소수점, 한국은 보통 2자리
+                if price >= 1000:
+                    pstr = f"{price:,.2f}"
+                else:
+                    pstr = f"{price:,.2f}"
+                col.metric(m.get("name") or m.get("key"), pstr, delta=delta)
+            else:
+                col.metric(m.get("name") or "—", "—", delta=None)
+
+    with st.expander("📈 최근 추이 그래프 (약 1개월)", expanded=False):
+        chart_cols = st.columns(min(3, max(1, len([x for x in _markets if x.get("closes")]))))
+        plotted = 0
+        for m in _markets:
+            closes = m.get("closes") or []
+            if len(closes) < 2:
+                continue
+            df = pd.DataFrame({"종가": closes})  # noqa
+            if False:
+                df = pd.DataFrame({"종가": closes})
+            with chart_cols[plotted % len(chart_cols)]:
+                st.caption(m.get("name") or m.get("key"))
+                st.line_chart(df, height=180)
+            plotted += 1
+        if plotted == 0:
+            st.caption("그래프용 일봉을 아직 받지 못했습니다.")
+        srcs = sorted({m.get("source") for m in _markets if m.get("source")})
+        if srcs:
+            st.caption("데이터: " + ", ".join(str(s) for s in srcs) + " · 참고용(지연 가능)")
+else:
+    st.caption("주요 시장 요약을 불러오지 못했습니다.")
 
 # 설정 점검 (웹 Secrets / 로컬 .env)
 _missing_keys = []
