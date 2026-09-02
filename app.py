@@ -119,6 +119,15 @@ def opinion_color(opinion: str) -> str:
     }.get(opinion, "#6b7280")
 
 # ── 데이터 수집 ──────────────────────────────────
+@st.cache_resource
+def get_kis_client() -> KISClient:
+    """
+    프로세스당 KISClient 1개만 유지 → access token 재사용.
+    (페이지마다 new KISClient() 하면 tokenP가 중복 발급되어 EGW00133 유발)
+    """
+    return KISClient()
+
+
 @st.cache_data(ttl=600)
 def fetch_disclosures():
     """DART 공시 (키 없으면 빈 dict). TTL 10분."""
@@ -139,7 +148,7 @@ def fetch_disclosures():
 def fetch_markets():
     """한·미·일 주요 지수/대용. TTL 2분."""
     try:
-        return fetch_market_overview(KISClient())
+        return fetch_market_overview(get_kis_client())
     except Exception as e:
         return [{"key": "error", "name": "시장요약", "ok": False, "error": str(e),
                  "price": None, "change_rate": None, "closes": [], "region": ""}]
@@ -147,7 +156,7 @@ def fetch_markets():
 
 @st.cache_data(ttl=60)
 def collect_data():
-    client = KISClient()
+    client = get_kis_client()
     results = []
 
     # 시장 벤치마크 조회
@@ -808,10 +817,7 @@ elif not run_verify:
     st.caption("체크하면 종목별 일봉을 조회해 1주·1개월 수익을 계산합니다.")
 else:
     try:
-        try:
-            _client = client  # 상단에서 생성된 KISClient 재사용
-        except NameError:
-            _client = KISClient()
+        _client = get_kis_client()
 
         with st.spinner("일봉 조회 및 수익률 계산 중…"):
             verified, summary = load_and_verify(

@@ -166,6 +166,8 @@ class KISClient:
         Access Token 발급 또는 캐시된 토큰 반환.
 
         tokenP는 POST 전용!
+        동일 인스턴스에서는 만료 전까지 재사용.
+        EGW00133(발급 제한) 시 65초 대기 후 1회 재시도.
         """
         now = time.time()
 
@@ -187,34 +189,57 @@ class KISClient:
             "appsecret": self.app_secret,
         }
 
-        resp = self._request_with_retry(
-            url,
-            method="POST",
-            headers=headers,
-            json=body,
-        )
+        last_err: Optional[Exception] = None
+        for attempt in range(2):
+            resp = self._request_with_retry(
+                url,
+                method="POST",
+                headers=headers,
+                json=body,
+            )
+            body_text = (resp.text or "")[:500]
+            if resp.status_code >= 400:
+                if (
+                    attempt == 0
+                    and (
+                        "EGW00133" in body_text
+                        or "접근토큰" in body_text
+                    )
+                ):
+                    logger.warning(
+                        "KIS token rate limit (EGW00133) — 65s 후 재시도"
+                    )
+                    time.sleep(65)
+                    last_err = RuntimeError(
+                        f"KIS HTTP {resp.status_code} 오류 - "
+                        f"KIS 응답: {body_text}"
+                    )
+                    continue
+                self._raise_detail(resp)
 
-        self._raise_detail(resp)
+            data = self._parse_json(
+                resp,
+                "토큰 발급",
+            )
 
-        data = self._parse_json(
-            resp,
-            "토큰 발급",
-        )
+            self.access_token = data["access_token"]
 
-        self.access_token = data["access_token"]
+            expires_in = int(
+                data.get("expires_in", 86400)
+            )
 
-        expires_in = int(
-            data.get("expires_in", 86400)
-        )
+            self.token_expires_at = time.time() + expires_in
 
-        self.token_expires_at = now + expires_in
+            logger.info(
+                "KIS access token 발급 완료 (env=%s)",
+                KIS_ENV,
+            )
 
-        logger.info(
-            "KIS access token 발급 완료 (env=%s)",
-            KIS_ENV,
-        )
+            return self.access_token
 
-        return self.access_token
+        if last_err:
+            raise last_err
+        raise RuntimeError("KIS 토큰 발급 실패")
 
     def get_current_price(
         self,
