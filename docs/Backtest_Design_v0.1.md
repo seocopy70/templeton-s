@@ -43,12 +43,29 @@ as_of (날짜)
 ## CLI 예
 
 ```bash
-# 단일일
+# 시나리오 목록
+python scripts/run_backtest.py --list
+
+# 1순위: 2024-08 폭락
+python scripts/run_backtest.py --scenario crash_202408
+
+# 코로나 / 약세 / 대조
+python scripts/run_backtest.py --scenario crash_202003
+python scripts/run_backtest.py --scenario bear_2022
+python scripts/run_backtest.py --scenario calm_2023
+python scripts/run_backtest.py --scenario pre_crash_2024
+
+# 단일일·임의 기간
 python scripts/run_backtest.py --as-of 2024-08-05
-
-# 기간 (매 N 거래일)
-python scripts/run_backtest.py --start 2024-01-02 --end 2024-03-29 --step 5
-
-# 폭락 시나리오 샘플 (내장 구간)
-python scripts/run_backtest.py --scenario crash_sample
+python scripts/run_backtest.py --start 2024-07-15 --end 2024-09-30 --step 1
 ```
+
+### 내장 시나리오
+
+| 이름 | 구간 | step | 설명 |
+|------|------|------|------|
+| `crash_202408` | 2024-07-15 ~ 2024-09-30 | 1 | 8/5 폭락 직전~반등 |
+| `crash_202003` | 2020-02-10 ~ 2020-05-29 | 1 | 코로나 저점·V반등 |
+| `bear_2022` | 2022-01-03 ~ 2022-06-30 | 2 | 상반기 약세 |
+| `calm_2023` | 2023-04-01 ~ 2023-09-29 | 5 | 대조(비폭락) |
+| `pre_crash_2024` | 2024-03-01 ~ 2024-06-28 | 5 | 8월 폭락 직전 평시 |

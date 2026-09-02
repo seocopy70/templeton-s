@@ -34,27 +34,72 @@ from .performance import summarize, print_summary  # noqa: E402
 
 OUTPUT_DIR = ROOT / "data" / "backtest"
 
-# 내장 시나리오 (샘플 — 데이터 가용 범위에 따라 결과 밀도 다름)
+# 내장 시나리오 (실제 역사 구간)
+# step=1 → 거래일마다 템플턴 일일 재현 (라이브와 동일 리듬)
 SCENARIOS: dict[str, dict[str, str]] = {
-    "crash_sample": {
-        "label": "최근 급락 샘플 구간",
-        "start": "2024-07-01",
-        "end": "2024-08-15",
-        "step": "3",
+    # ── 폭락 / 약세 (우선 검증) ──
+    "crash_202408": {
+        "label": "2024-08 폭락 (8/5 코스피 -8.77%, 직전~반등)",
+        "start": "2024-07-15",
+        "end": "2024-09-30",
+        "step": "1",
     },
-    "bear_sample": {
-        "label": "약세 샘플",
-        "start": "2024-01-02",
-        "end": "2024-03-29",
+    "crash_202003": {
+        "label": "2020-03 코로나 폭락 (3/19 저점 부근, V반등)",
+        "start": "2020-02-10",
+        "end": "2020-05-29",
+        "step": "1",
+    },
+    "bear_2022": {
+        "label": "2022 상반기 약세장 (금리·연간 약세 국면)",
+        "start": "2022-01-03",
+        "end": "2022-06-30",
+        "step": "2",
+    },
+    # ── 대조 (선택편향 완화) ──
+    "calm_2023": {
+        "label": "2023 대조 구간 (극단 폭락 아닌 반등·평시)",
+        "start": "2023-04-01",
+        "end": "2023-09-29",
         "step": "5",
     },
+    "pre_crash_2024": {
+        "label": "2024 폭락 직전 평시·상승 (3~6월)",
+        "start": "2024-03-01",
+        "end": "2024-06-28",
+        "step": "5",
+    },
+    # 하위 호환 별칭
+    "crash_sample": {
+        "label": "alias → crash_202408",
+        "start": "2024-07-15",
+        "end": "2024-09-30",
+        "step": "1",
+    },
+    "bear_sample": {
+        "label": "alias → bear_2022",
+        "start": "2022-01-03",
+        "end": "2022-06-30",
+        "step": "2",
+    },
     "normal_sample": {
-        "label": "일반 샘플",
-        "start": "2024-09-02",
-        "end": "2024-11-29",
+        "label": "alias → calm_2023",
+        "start": "2023-04-01",
+        "end": "2023-09-29",
         "step": "5",
     },
 }
+
+
+def list_scenarios() -> None:
+    print("Available scenarios:")
+    for key, sc in SCENARIOS.items():
+        if key.endswith("_sample"):
+            continue  # 별칭은 목록에서 숨김
+        print(
+            f"  {key:18s}  {sc['start']} → {sc['end']}  "
+            f"step={sc['step']}  {sc['label']}"
+        )
 
 DISPLAY_ORDER = [
     "005930",
@@ -263,7 +308,8 @@ def run_range(
 def run_scenario(name: str, **kwargs) -> list[dict[str, Any]]:
     sc = SCENARIOS.get(name)
     if not sc:
-        raise ValueError(f"Unknown scenario: {name}. Available: {list(SCENARIOS)}")
+        list_scenarios()
+        raise ValueError(f"Unknown scenario: {name}")
     print(f"[backtest] scenario={name} ({sc['label']})")
     return run_range(
         sc["start"],
