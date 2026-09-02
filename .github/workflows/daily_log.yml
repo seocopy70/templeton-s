@@ -1,0 +1,58 @@
+# 템플턴S 일일 판단 기록
+# 한국 장 마감(15:30 KST) 약 2시간 후 = 17:30 KST = 08:30 UTC
+name: Daily decision log
+
+on:
+  schedule:
+    # 평일만 (월~금). 한국은 DST 없음 → 연중 동일
+    - cron: "30 8 * * 1-5"
+  workflow_dispatch:  # 수동 실행
+
+permissions:
+  contents: write
+
+jobs:
+  log:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run daily log
+        env:
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+          KIS_ENV: ${{ secrets.KIS_ENV }}
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+          # AI는 일일 스냅샷에서 호출하지 않음 (키 없어도 동작)
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          # secrets에 KIS_ENV가 없으면 paper 기본
+          export KIS_ENV="${KIS_ENV:-paper}"
+          python scripts/daily_log.py
+
+      - name: Commit decisions.jsonl if changed
+        run: |
+          git config user.name "templeton-s-bot"
+          git config user.email "templeton-s-bot@users.noreply.github.com"
+          mkdir -p data
+          touch data/decisions.jsonl
+          git add data/decisions.jsonl data/decisions_*.jsonl 2>/dev/null || true
+          if git diff --staged --quiet; then
+            echo "No log changes to commit"
+          else
+            git commit -m "chore(data): daily decision log $(date -u +%Y-%m-%d)"
+            git push
+          fi
