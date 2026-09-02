@@ -69,10 +69,25 @@ def humanize_error(err: str) -> str:
     raw = err or "알 수 없는 오류"
     if "kis_app_key" in e or "kis_app_secret" in e or "필수 환경변수" in e:
         return "API 키가 없습니다. 로컬은 config/.env, 웹은 Streamlit Secrets에 KIS_APP_KEY / KIS_APP_SECRET을 넣으세요."
-    if "401" in e or "unauthorized" in e or "egw001" in e:
+    # 토큰 발급 쿨다운 (EGW00133) — 401/키 오류보다 먼저 판별
+    if "egw00133" in e or ("접근토큰" in raw and "잠시" in raw) or (
+        "토큰" in raw and "1분" in raw
+    ):
+        return (
+            "토큰 발급 제한(EGW00133). 짧은 시간에 요청이 몰렸습니다. "
+            "1~2분 기다린 뒤 새로고침하세요. 앱·백테스트·Actions를 동시에 돌리지 마세요."
+        )
+    if "401" in e or "unauthorized" in e or "egw00001" in e or "egw00123" in e:
         return "인증 실패(401). 키·시크릿이 맞는지, KIS_ENV(paper/real)와 앱키 종류가 일치하는지 확인하세요."
-    if "403" in e or "forbidden" in e or "ip" in e:
-        return "접근 거부(403/IP). KIS 포털에 접속 IP가 등록됐는지 확인하세요. Cloud 배포 시 IP가 달라질 수 있습니다."
+    if "egw001" in e and "egw00133" not in e:
+        # 기타 EGW001xx — 원문 힌스 유지
+        if "403" in e or "ip" in e:
+            return "접근 거부(403/IP). KIS 포털에 접속 IP가 등록됐는지 확인하세요. Cloud 배포 시 IP가 달라질 수 있습니다."
+        return "KIS 인증/권한 오류. 키·KIS_ENV·IP 허용을 확인하세요. 잠시 후 재시도해 보세요."
+    if "403" in e or "forbidden" in e:
+        if "ip" in e or "허용" in raw:
+            return "접근 거부(403/IP). KIS 포털에 접속 IP가 등록됐는지 확인하세요. Cloud 배포 시 IP가 달라질 수 있습니다."
+        return "접근 거부(403). IP 허용 또는 잠시 후 재시도를 확인하세요."
     if "timeout" in e or "timed out" in e:
         return "응답 시간 초과. 네트워크 또는 KIS 서버 지연일 수 있습니다. 잠시 후 새로고침하세요."
     if "500" in e or "502" in e or "503" in e:
