@@ -32,7 +32,7 @@ jobs:
       - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
-          ref: \${{ github.head_ref }}
+          ref: ${{ github.head_ref }}
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -90,12 +90,12 @@ jobs:
           pip install -r requirements.txt
       - name: Require FRED API secret
         env:
-          FRED_API_KEY: \${{ secrets.FRED_API_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: |
           test -n "$FRED_API_KEY" || { echo "::error::FRED_API_KEY GitHub Secret is missing."; exit 1; }
       - name: Collect live FRED data
         env:
-          FRED_API_KEY: \${{ secrets.FRED_API_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python scripts/collect_macro.py
       - name: Validate live FRED output
         run: |
@@ -123,7 +123,7 @@ jobs:
       - name: Upload live FRED data artifact
         uses: actions/upload-artifact@v4
         with:
-          name: fred-macro-integration-\${{ github.sha }}
+          name: fred-macro-integration-${{ github.sha }}
           path: |
             data/macro/raw/*.csv
             data/macro/processed/macro_daily.csv
@@ -147,12 +147,12 @@ jobs:
           pip install -r requirements.txt
       - name: Require FRED API secret
         env:
-          FRED_API_KEY: \${{ secrets.FRED_API_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: |
           test -n "$FRED_API_KEY" || { echo "::error::FRED_API_KEY GitHub Secret is missing."; exit 1; }
       - name: Collect FRED macro data
         env:
-          FRED_API_KEY: \${{ secrets.FRED_API_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python scripts/collect_macro.py
       - name: Commit macro data if changed
         run: |
