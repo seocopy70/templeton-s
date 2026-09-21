@@ -57,9 +57,19 @@ streamlit run app.py
 - `docs/Templeton_Score_Calculation_v0.1.md`
 - `docs/KIS_API_Guide.md`
 - `docs/Phase4_News_Disclosure_Design_v0.1.md`
+- `docs/Macro_Data_Layer_v0.1.md`
 
 ## 원칙 요약
 - AI는 참모, 최종 결정은 사용자
 - 가격과 가치를 분리
 - 프로그램이 계산, AI가 해석
 - 자동매매는 초기 범위에서 제외
+
+## Macro 데이터 수집 (v0.1)
+
+FRED 기반 거시 데이터 수집 계층을 기존 Templeton Score와 분리해 운영합니다.
+
+- 수집 대상: DGS10, DFF, DTWEXBGS, DEXKOUS, SP500, NASDAQCOM
+- GitHub Actions가 평일 09:00 UTC에 수집하고 data/macro에 저장
+- Repository Secret FRED_API_KEY 필요
+- v0.1에서는 기존 Score 계산에 연결하지 않음
