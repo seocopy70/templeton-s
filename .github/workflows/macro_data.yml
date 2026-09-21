@@ -16,14 +16,15 @@ permissions:
   contents: write
 
 jobs:
-  collect:
+  validate:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout
+      - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref || github.ref }}
+          ref: ${{ github.head_ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -36,13 +37,74 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Validate macro layer without API access
+        run: |
+          python - <<'PY'
+          import os
+          import sys
+          sys.path.insert(0, "src")
+          from macro.config import FRED_SERIES
+          from macro.fred import fetch_series
+          from macro.storage import RAW_DIR, PROCESSED_DIR
+
+          expected = {"DGS10", "DFF", "DTWEXBGS", "DEXKOUS", "SP500", "NASDAQCOM"}
+          assert set(FRED_SERIES) == expected, F"Unexpected FRED series: {set(FRED_SERIES)}"
+          assert (RAW_DIR.parent / "raw").name == "raw"
+          assert PROCESSED_DIR.name == "processed"
+
+          old = os.environ.pop("FRED_API_KEY", None)
+          try:
+              try:
+                  fetch_series("DGS10")
+              except ValueError as exc:
+                  assert "FRED_API_KEY is not set" in str(exc)
+              else:
+                  raise AssertionError("fetch_series unexpectedly reached the API without a key")
+          finally:
+              if old is not None:
+                  os.environ["FRED_API_KEY"] = old
+
+          print("Macro layer structural validation passed.")
+          print("Expected series:", ", ".join(sorted(expected)))
+          PY
+
+      - name: Verify collection script imports
+        run: python -c "import sys; sys.path.insert(0, 'src'); import macro.fred, macro.storage, macro.validate; print('Macro modules import successfully.')"
+
+  collect:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Require FRED API secret
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: |
+          test -n "$FRED_API_KEY" || {
+            echo "::error::FRED_API_KEY GitHub Secret is missing."
+            exit 1
+          }
+
       - name: Collect FRED macro data
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python scripts/collect_macro.py
 
       - name: Commit macro data if changed
-        if: github.event_name != 'pull_request'
         run: |
           git config user.name "templeton-s-bot"
           git config user.email "templeton-s-bot@users.noreply.github.com"
