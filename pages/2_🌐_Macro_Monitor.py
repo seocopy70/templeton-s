@@ -106,14 +106,14 @@ for sid in available:
 with st.expander("데이터 상태"):
     status_rows = []
     for sid in available:
-        series = df[sid].dropna()
+        series = df[["observation_date", sid]].dropna()
         status_rows.append(
             {
                 "시계열": sid,
                 "설명": SERIES[sid][0],
                 "관측치 수": len(series),
-                "최초 관측일": series.index.min() if False else df.loc[series.index, "observation_date"].min().strftime("%Y-%m-%d"),
-                "최근 관측일": df.loc[series.index, "observation_date"].max().strftime("%Y-%m-%d"),
+                "최초 관측일": series["observation_date"].min().strftime("%Y-%m-%d"),
+                "최근 관측일": series["observation_date"].max().strftime("%Y-%m-%d"),
             }
         )
     st.dataframe(pd.DataFrame(status_rows), use_container_width=True, hide_index=True)
