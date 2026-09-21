@@ -5,6 +5,12 @@ on:
   schedule:
     - cron: "0 9 * * 1-5"
   workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/macro_data.yml"
+      - "scripts/collect_macro.py"
+      - "src/macro/**"
+      - "requirements.txt"
 
 permissions:
   contents: write
@@ -16,6 +22,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -34,6 +42,7 @@ jobs:
         run: python scripts/collect_macro.py
 
       - name: Commit macro data if changed
+        if: github.event_name != 'pull_request'
         run: |
           git config user.name "templeton-s-bot"
           git config user.email "templeton-s-bot@users.noreply.github.com"
