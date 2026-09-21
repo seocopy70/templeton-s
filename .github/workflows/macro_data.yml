@@ -11,6 +11,14 @@ on:
       - "scripts/collect_macro.py"
       - "src/macro/**"
       - "requirements.txt"
+  push:
+    branches:
+      - feature/fred-macro-layer-v0-1
+    paths:
+      - ".github/workflows/macro_data.yml"
+      - "scripts/collect_macro.py"
+      - "src/macro/**"
+      - "requirements.txt"
 
 permissions:
   contents: write
@@ -24,34 +32,28 @@ jobs:
       - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref }}
-
+          ref: \${{ github.head_ref }}
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
       - name: Validate macro layer without API access
         run: |
           python - <<'PY'
-          import os
-          import sys
+          import os, sys
           sys.path.insert(0, "src")
           from macro.config import FRED_SERIES
           from macro.fred import fetch_series
           from macro.storage import RAW_DIR, PROCESSED_DIR
-
           expected = {"DGS10", "DFF", "DTWEXBGS", "DEXKOUS", "SP500", "NASDAQCOM"}
-          assert set(FRED_SERIES) == expected, F"Unexpected FRED series: {set(FRED_SERIES)}"
-          assert (RAW_DIR.parent / "raw").name == "raw"
+          assert set(FRED_SERIES) == expected
+          assert RAW_DIR.name == "raw"
           assert PROCESSED_DIR.name == "processed"
-
           old = os.environ.pop("FRED_API_KEY", None)
           try:
               try:
@@ -63,47 +65,95 @@ jobs:
           finally:
               if old is not None:
                   os.environ["FRED_API_KEY"] = old
-
           print("Macro layer structural validation passed.")
-          print("Expected series:", ", ".join(sorted(expected)))
           PY
-
       - name: Verify collection script imports
         run: python -c "import sys; sys.path.insert(0, 'src'); import macro.fred, macro.storage, macro.validate; print('Macro modules import successfully.')"
 
-  collect:
-    if: github.event_name != 'pull_request'
+  integration:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feature/fred-macro-layer-v0-1'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout
+      - name: Checkout feature branch
         uses: actions/checkout@v4
-
+        with:
+          ref: feature/fred-macro-layer-v0-1
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
       - name: Require FRED API secret
         env:
-          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          FRED_API_KEY: \${{ secrets.FRED_API_KEY }}
         run: |
-          test -n "$FRED_API_KEY" || {
-            echo "::error::FRED_API_KEY GitHub Secret is missing."
-            exit 1
-          }
+          test -n "$FRED_API_KEY" || { echo "::error::FRED_API_KEY GitHub Secret is missing."; exit 1; }
+      - name: Collect live FRED data
+        env:
+          FRED_API_KEY: \${{ secrets.FRED_API_KEY }}
+        run: python scripts/collect_macro.py
+      - name: Validate live FRED output
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import pandas as pd
+          series = ["DGS10", "DFF", "DTWEXBGS", "DEXKOUS", "SP500", "NASDAQCOM"]
+          required = {"observation_date", "value", "series_id", "source", "retrieved_at"}
+          for sid in series:
+              path = Path("data/macro/raw") / f"{sid}.csv"
+              assert path.exists(), f"Missing raw file: {path}"
+              df = pd.read_csv(path)
+              assert not df.empty, f"Empty raw file: {path}"
+              assert required.issubset(df.columns), f"Missing columns in {path}"
+              assert df["value"].notna().any(), f"No numeric values in {path}"
+              print(f"{sid}: rows={len(df)} last={df['observation_date'].max()}")
+          processed = Path("data/macro/processed/macro_daily.csv")
+          assert processed.exists(), "Missing processed macro_daily.csv"
+          df = pd.read_csv(processed)
+          assert not df.empty, "Processed macro_daily.csv is empty"
+          for sid in series:
+              assert sid in df.columns, f"Missing processed column: {sid}"
+          print(f"processed: rows={len(df)} columns={len(df.columns)}")
+          PY
+      - name: Upload live FRED data artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fred-macro-integration-\${{ github.sha }}
+          path: |
+            data/macro/raw/*.csv
+            data/macro/processed/macro_daily.csv
+          retention-days: 7
 
+  collect:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Require FRED API secret
+        env:
+          FRED_API_KEY: \${{ secrets.FRED_API_KEY }}
+        run: |
+          test -n "$FRED_API_KEY" || { echo "::error::FRED_API_KEY GitHub Secret is missing."; exit 1; }
       - name: Collect FRED macro data
         env:
-          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          FRED_API_KEY: \${{ secrets.FRED_API_KEY }}
         run: python scripts/collect_macro.py
-
       - name: Commit macro data if changed
         run: |
           git config user.name "templeton-s-bot"
