@@ -118,6 +118,27 @@ Market Snapshot
 
 **중요:** 기존 정상 작동하는 KIS/Score/DB 계산 로직을 불필요하게 재작성하지 않는다. 현재 `scripts/daily_collect.py`는 오래된 모듈 참조와 random mock fallback이 확인되었으므로 검증 없이 Oracle 자동수집에 사용하지 않는다. 기존 정상 로직을 재사용하는 안전한 단일 수집 경로를 먼저 확립한다.
 
+## Neon DB 구조 재정비 방향 — 2026-09-26
+
+현재 Neon은 prices_daily / templeton_scores / macro_daily 중심의 단순 구조이고, 기존 문서의 market_snapshots / judgments 등은 설계 초안 수준이다. 따라서 바로 테이블을 변경하지 않고 실제 Oracle DB의 현재 스키마와 코드 사용처를 먼저 대조한 뒤 단계적으로 재설계한다.
+
+재설계의 기준은 다음과 같다.
+
+- Market Snapshot을 자동 수집의 기준 단위로 둔다. 한 수집 시점의 KIS·시장·기업·FRED 데이터를 연결할 수 있어야 한다.
+- FRED 원자료와 AI 해석을 분리한다. 같은 값이 반복되더라도 실제 수집 시각과 FRED 관측일/값을 구분해 보존한다.
+- AI Guide 판단은 당시 입력 스냅샷과 연결된 불변 기록으로 남긴다. 나중에 판단 문구를 덮어쓰지 않는다.
+- Panic Watch는 별도 수집 테이블이 아니라 여러 Snapshot을 연결하는 사건/상태 기록으로 설계한다.
+- 사후검증 Outcome은 원래 판단과 분리하여 나중에 추가한다.
+- 앱을 열 때마다 기록을 만드는 구조는 사용하지 않는다. 현재 조회에는 데이터 기준시각/신선도(freshness)를 표시한다.
+- 향후 필요하면 사용자가 의도적으로 남기는 수동 현재상태 Snapshot을 별도 기능으로 추가할 수 있지만, 자동 기록과 섞지 않는다.
+- 기존 prices_daily, templeton_scores, macro_daily를 당장 폐기하거나 대량 마이그레이션하지 않는다. 실제 사용처와 과거 데이터 보존 필요성을 확인한 뒤 단계적으로 확장/전환한다.
+
+목표 구조의 개념은 다음과 같다.
+
+collection_run → market_snapshot → raw/context data + score → ai_judgment → panic_event/state → outcome
+
+이 구조는 기록의 재현성을 확보하면서도 앱 조회와 자동 축적을 분리하는 것을 목표로 한다.
+
 ## 현재 알려진 문제
 
 React/Oracle 이식 과정에서 일부 기존 문서와 실제 작업본 사이에 차이가 있다. 실제 코드/서버 상태를 우선 확인한다.
