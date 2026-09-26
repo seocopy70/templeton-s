@@ -1,0 +1,27 @@
+name: Snapshot Pipeline CI
+
+on:
+  push:
+    paths:
+      - 'collector/**'
+      - 'db/**'
+      - 'scripts/collect_snapshot.py'
+      - 'requirements.txt'
+  pull_request:
+    paths:
+      - 'collector/**'
+      - 'db/**'
+      - 'scripts/collect_snapshot.py'
+      - 'requirements.txt'
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Compile Python modules
+        run: python -m compileall -q collector db scripts/collect_snapshot.py src
