@@ -18,6 +18,37 @@ jobs:
 
       - run: pip install -r requirements.txt
 
+      - name: Diagnose KIS credentials against both environments
+        env:
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+        run: |
+          python - <<'PY'
+          import os
+          import requests
+
+          for label, url in [
+              ("paper", "https://openapivts.koreainvestment.com:29443/oauth2/tokenP"),
+              ("real", "https://openapi.koreainvestment.com:9443/oauth2/tokenP"),
+          ]:
+              r = requests.post(
+                  url,
+                  headers={"content-type": "application/json"},
+                  json={
+                      "grant_type": "client_credentials",
+                      "appkey": os.environ["KIS_APP_KEY"],
+                      "appsecret": os.environ["KIS_APP_SECRET"],
+                  },
+                  timeout=15,
+              )
+              try:
+                  body = r.json()
+                  code = body.get("msg_cd") or body.get("error_code") or ""
+                  msg = body.get("msg1") or body.get("error_description") or ""
+              except Exception:
+                  code, msg = "", (r.text or "")[:120]
+              print(f"KIS {label}: HTTP {r.status_code}, code={code}, msg={msg}")
+          PY
       - name: Run new snapshot collector
         env:
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
