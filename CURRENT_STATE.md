@@ -83,6 +83,19 @@ React 흰 화면의 원인을 최소 범위에서 해결한다.
 - FastAPI의 현재 `/`는 200이지만 `/scores`, `/prices`는 404. 실제 데이터 연결은 아직 미완료.
 - 기존 Streamlit `app.py` 및 `src/market_data.py`, `src/score_engine.py`를 확인한 결과 실제 KIS 현재가/일봉 데이터와 기존 Templeton Score 계산 로직이 이미 존재함. 따라서 React 이식에서는 새 계산 로직을 만들기보다 기존 로직을 API에 연결하는 것을 우선함.
 
+### 작업 방향 확정 — Main App 우선 이식
+
+레포 전체를 확인한 결과 Templeton S는 단일 앱이 아니라 다음 계층으로 확장되어 있음.
+- **Main App**: `app.py` + `src/kis_client.py` + `src/market_data.py` + `src/score_engine.py` + 시장모드/공시/AI/판단기록/사후검증 모듈
+- **Macro 확장**: `src/macro/*`, `scripts/collect_macro.py`, GitHub Actions `macro_data.yml`, Streamlit `pages/2_🌐_Macro_Monitor.py`
+- **Backtest 확장**: `backtest/*`, `scripts/run_backtest.py`
+- **Daily/Ops 확장**: `scripts/daily_collect.py`, `scripts/daily_log.py`, 관련 GitHub Actions
+- **React/FastAPI 이식본**: 현재 Oracle 작업본의 `frontend/`, `api/`는 아직 GitHub main에 기준선으로 반영되지 않은 상태.
+
+이식 전략은 **전체 기능을 한꺼번에 옮기지 않고 Main App을 먼저 기존 Streamlit과 기능/데이터 기준으로 최대한 동일하게 복원**한다. Main App의 실제 KIS 가격·60일 일봉·Templeton Score·시장모드·관심종목 표/상세·판단기록을 먼저 React에서 검증한 뒤, Macro / Backtest / Daily/Ops를 순차 이식한다.
+
+현재 React의 mock 종목/Score/가격은 실제 데이터 연결 전 임시 UI이며, 기존 `app.py`의 계산 로직을 재작성하지 않는다. API 계층은 기존 Python 모듈을 호출하는 얇은 어댑터로 설계한다.
+
 ### 다음 작업
 1. 기존 Streamlit 화면의 실제 기능/표시 항목과 현재 React 구현을 대조한다.
 2. 기존 KIS/Score/DB 흐름을 최대한 보존하면서 React용 FastAPI API 설계를 확정한다.
