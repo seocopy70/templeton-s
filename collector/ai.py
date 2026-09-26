@@ -127,4 +127,4 @@ def get_provider() -> AIProvider:
     provider = os.getenv("AI_PROVIDER", "groq").strip().lower()
     if provider == "groq":
         return GroqProvider()
-    return AIProvider()
+    raise ValueError(f"Unsupported AI_PROVIDER: {provider}")
