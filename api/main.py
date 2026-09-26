@@ -102,7 +102,7 @@ def health() -> dict[str, Any]:
 
 
 @app.get("/scores")
-def scores(force: bool = Query(False)) -> dict[str, Any]:
+def scores(force: bool = Query(False)) -> list[dict[str, Any]]:
     try:
         return _get_scores(force=force)
     except Exception as exc:
