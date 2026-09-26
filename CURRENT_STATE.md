@@ -29,6 +29,8 @@
 - Oracle용 09:30 / 17:00 systemd timer 템플릿 추가
 - 기존 daily collector workflow는 운영 스케줄에서 제거하고 수동 검증용으로 전환
 - snapshot pipeline compile CI 추가
+- FastAPI를 새 구조에 맞게 read-only current/snapshot/judgment/panic API로 재작성
+- Collector가 첫 실행 시 Neon schema를 준비하도록 보완
 
 ## 운영 원칙
 
@@ -51,7 +53,7 @@ KIS + FRED/시장 컨텍스트 → Snapshot → Score → AI → Panic Watch →
 
 1. 새 collector CI/실행 검증
 2. Neon end-to-end Snapshot 1회 생성 확인
-3. FastAPI를 현재 데이터 + 최근 Snapshot 판단 조회 구조로 재작성
+3. FastAPI 현재 데이터 + 최근 Snapshot 판단 조회 구조를 CI/실행 검증
 4. React 새 화면 구현
 5. 통합 테스트 후 GitHub main 기준본 확정
 6. Oracle 기존 실행체계를 새 코드로 교체
