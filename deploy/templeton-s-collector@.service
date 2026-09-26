@@ -1,0 +1,10 @@
+[Unit]
+Description=Templeton S snapshot collector (one-shot)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/opc/templeton-s
+EnvironmentFile=/home/opc/templeton-s/config/.env
+ExecStart=/home/opc/templeton-s/.venv/bin/python /home/opc/templeton-s/scripts/collect_snapshot.py --slot %i
