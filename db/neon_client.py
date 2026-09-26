@@ -101,7 +101,7 @@ def init_tables():
 
 
 def begin_collection_run(slot: str | None, captured_at: datetime) -> str:
-    run_id = uuid.uuid4()
+    run_id = str(uuid.uuid4())
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -109,7 +109,7 @@ def begin_collection_run(slot: str | None, captured_at: datetime) -> str:
                 (run_id, slot, captured_at, "running"),
             )
         conn.commit()
-    return str(run_id)
+    return run_id
 
 
 def finish_collection_run(run_id: str, status: str, snapshot_id: str | None, error: str | None = None) -> None:
@@ -123,7 +123,7 @@ def finish_collection_run(run_id: str, status: str, snapshot_id: str | None, err
 
 
 def insert_snapshot(*, run_id: str, captured_at: datetime, market_data: dict[str, Any], macro_data: dict[str, Any]) -> str:
-    snapshot_id = uuid.uuid4()
+    snapshot_id = str(uuid.uuid4())
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -131,7 +131,7 @@ def insert_snapshot(*, run_id: str, captured_at: datetime, market_data: dict[str
                 (snapshot_id, run_id, captured_at, Json(market_data), Json(macro_data)),
             )
         conn.commit()
-    return str(snapshot_id)
+    return snapshot_id
 
 
 def insert_score(snapshot_id: str, row: dict[str, Any], score: dict[str, Any]) -> None:
