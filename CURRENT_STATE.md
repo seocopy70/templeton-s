@@ -163,3 +163,16 @@ React에서 Score를 다시 계산하지 않는다.
 4. `/prices` 또는 history API → 실제 60일 History 연결.
 5. 공개 URL에서 실제 수치와 오류/호출량을 검증한다.
 6. 검증 후 GitHub 기준본을 안전하게 확립한다.
+
+
+## 2026-09-26 실제 구현 진행 결과
+
+- `api/main.py`를 GitHub main에 추가했다. 기존 `src/market_data.py`, `src/kis_client.py`, `src/score_engine.py`, `src/market_overview.py`, `src/decision_log.py`를 호출하는 thin adapter 방식이다.
+- 추가 API: `GET /scores`, `GET /prices/{symbol}/history?count=60`, `GET /market-overview`, `GET /decisions` (기존 `/`, `/health` 유지)
+- `/scores`는 기존 6종목 수집 → 재무비율 보강 → 기존 `calculate_templeton_score()` 호출 순서로 구성했다.
+- API 호출량을 줄이기 위해 scores/market-overview에 60초 메모리 캐시를 적용했다.
+- `requirements.txt`에 FastAPI/Uvicorn 의존성을 추가했다.
+- 기존 `src/`의 직접 import 구조를 보존하기 위해 API에서 `src`를 import path에 추가했다.
+- **검증 제한:** 현재 Oracle의 `api/main.py`와 `frontend/`는 아직 GitHub main에 없는 별도 작업본이므로, 이번 세션에서는 실제 Oracle 서버에 새 API를 배포하거나 공개 URL에서 실데이터 응답을 확인할 수 없었다. 따라서 API 구현은 GitHub 기준본에 반영했지만 '실행 검증 완료'로 기록하지 않는다.
+- React `App.jsx`도 Oracle 작업본에만 존재하는 상태이므로, 현재는 기존 화면 코드를 덮어쓰지 않았다. 다음 서버 접근/동기화 단계에서 실제 React 코드에 API 응답을 연결하고 공개 URL에서 검증한다.
+- **판정:** API adapter 구현 PASS(코드 반영), 실행/실데이터 검증 OPEN.
