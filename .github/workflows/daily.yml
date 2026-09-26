@@ -1,8 +1,6 @@
-name: Daily Templeton Collect to Neon
+name: Snapshot Pipeline Manual Verification
 
 on:
-  schedule:
-    - cron: '10 7 * * 1-5'  # 07:10 UTC = 16:10 KST 평일
   workflow_dispatch:
 
 jobs:
@@ -14,12 +12,14 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install -r requirements.txt
-      - name: Init & Collect
+      - name: Run new snapshot collector
         env:
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
           KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+          KIS_ENV: ${{ secrets.KIS_ENV }}
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-        run: |
-          python db/neon_client.py
-          python scripts/daily_collect.py
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_MODEL: llama-3.3-70b-versatile
+          AI_PROVIDER: groq
+        run: python scripts/collect_snapshot.py
