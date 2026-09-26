@@ -6,6 +6,16 @@ duplicated here.
 """
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# Existing Templeton modules live under src/ and use direct module imports
+# (config, kis_client, market_data, ...). Keep that module layout unchanged.
+ROOT = Path(__file__).resolve().parent.parent
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
+
 import time
 from typing import Any, Optional
 
