@@ -190,3 +190,13 @@ React에서 Score를 다시 계산하지 않는다.
 - **현재 주의:** `mockTickers`와 랜덤 `generateHistory()`는 아직 코드에 남아 있음. 따라서 Score History는 실제 데이터가 아니며, 실제 화면 검증 후 제거/대체 여부를 결정해야 함. mock-only 설명/수치가 실제 데이터와 섞이지 않도록 다음 단계에서 정리.
 - Oracle의 `db/neon_client.py`에는 React 이식과 직접 관계없는 별도 변경이 있으므로, 원인/필요성이 확인되기 전에는 GitHub main에 덮어쓰지 않음.
 - **다음 작업:** (1) `frontend`에서 `npm run build` 성공 확인 → (2) Caddy가 제공하는 공개 `/templeton/`에서 실제 API 점수/가격 표시 확인 → (3) 브라우저 오류 및 API 호출 검증 → (4) 랜덤 Score History 처리 → (5) 검증된 Oracle 변경만 GitHub 기준본으로 반영.
+
+## 2026-09-26 React 실데이터 검증 추가 기록
+
+- Oracle에서 `frontend` `npm run build` 성공 확인.
+- 공개 `/templeton/` HTTP 200 및 실제 Vite asset 경로 확인.
+- 공개 `/templeton-api/scores` HTTP 200 확인. KIS 실데이터와 기존 Templeton Score가 반환됨.
+- `069500` 예시: 현재가 113,145, 등락률 +1.13%, Score 48.8 확인.
+- Oracle에서 `/scores` 반환 타입 오류를 `list[dict[str, Any]]`로 수정하여 500 문제 해결. 동일 수정은 GitHub main에도 반영함 (commit `d2c6be2`).
+- React의 Score History는 아직 `mockTickers + generateHistory() + Math.random()` 기반임을 확인. 실제 가격 History API가 별도로 존재하므로 랜덤 데이터를 실데이터처럼 표시하지 않도록 다음 작업에서 제거/대체한다.
+- `db/neon_client.py`, `data/decisions.jsonl` 및 기타 미검증 Oracle 변경은 GitHub 기준본에 반영하지 않는다.
