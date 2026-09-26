@@ -2,6 +2,9 @@ name: Snapshot Pipeline Manual Verification
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - rebuild/snapshot-pipeline
 
 jobs:
   collect:
