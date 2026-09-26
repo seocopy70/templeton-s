@@ -121,3 +121,45 @@ React 흰 화면의 원인을 최소 범위에서 해결한다.
 - 기록은 수학증명 프로젝트와 같은 방식으로 **작업 연속성을 위한 기준점**으로 사용한다. 완료된 작업을 반복하지 않고, 실제 코드/서버 상태와 문서가 다르면 실제 상태를 우선 확인한 뒤 기록을 수정한다.
 - 단순한 중간 작업이나 이미 기록된 내용을 반복해서 문서화하지 않는다.
 - 다음 채팅에서 작업을 재개할 때는 `PROJECT_INSTRUCTIONS.md`, `MIGRATION_PLAN.md`, `CURRENT_STATE.md`를 먼저 확인하고, `CURRENT_STATE.md`의 다음 작업부터 이어간다.
+
+
+## 2026-09-26 Main App 기능 대조 완료
+
+기존 Streamlit `app.py`를 기준으로 React Main App의 1차 이식 범위를 확정했다.
+
+### React Main App에 우선 필요한 실제 데이터/API
+- `/scores`: 6개 관심종목의 현재가, 등락률, 52주 고점대비, PER/PBR/EPS, Templeton Score 및 6개 구성요소, 의견, Value/Pessimism/Risk/Quality/Growth 입력값
+- `/prices/:symbol/history` 또는 동등한 History API: 기존 KIS `get_daily_closes()` 기반 60일 일봉
+- `/market-overview`: KOSPI/KOSDAQ/S&P500/NASDAQ/Nikkei225와 약 1개월 추이
+- `/decisions`: 기존 `decision_log.py`의 최근 판단 기록 및 종목 필터
+- 이후 단계 API: DART 공시, 시장모드/공황분류/기회순위, 사후검증
+
+### 계산 로직 보존 원칙
+React에서 Score를 다시 계산하지 않는다.
+- 가격/재무: `KISClient.get_current_price()`, `get_financial_ratios()`
+- 일봉: `get_daily_closes()`
+- 지표: `market_data.compute_volatility()`, `compute_momentum()`
+- Score: `calculate_templeton_score()`
+- 시장 요약: `fetch_market_overview()`
+- 판단 기록: `recent_decisions()`, `decisions_as_table_rows()`
+
+즉 FastAPI는 기존 Python 로직을 호출해 JSON으로 전달하는 **얇은 adapter**로 만든다.
+
+### 현재 React 화면과의 차이
+- 화면 구조/스타일: 정상 표시 확인
+- 가격/Score: 현재 mock → 실제 KIS/Score로 교체 필요
+- Score History: 현재 미연결 → 실제 60일 일봉/히스토리 API 연결 필요
+- 시장 요약: Streamlit 기능은 아직 React 미이식
+- 판단 기록: React 미이식
+- DART/시장모드/기회순위/사후검증: Main App 1차 연결 후 순차 이식
+
+### 안전성 결정
+현재 Oracle의 `frontend/`, `api/`, `data/decisions.jsonl`는 GitHub main의 검증된 기준본과 분리된 작업본이다. 따라서 **현재 단계에서는 GitHub main에 API 코드를 임의로 덮어쓰지 않는다.** Oracle 작업본의 실제 API/React 파일을 먼저 비교한 뒤, 검증된 변경만 기준본으로 반영한다.
+
+### 다음 실제 작업
+1. Oracle의 현재 `api/main.py`와 `frontend/src/App.jsx`를 실제 파일 기준으로 다시 확인한다.
+2. 기존 Python 모듈을 그대로 호출하는 최소 API adapter를 만든다.
+3. `/scores` → React 종목표/카드 연결.
+4. `/prices` 또는 history API → 실제 60일 History 연결.
+5. 공개 URL에서 실제 수치와 오류/호출량을 검증한다.
+6. 검증 후 GitHub 기준본을 안전하게 확립한다.
