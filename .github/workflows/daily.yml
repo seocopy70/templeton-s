@@ -18,14 +18,30 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - name: Diagnose KIS credentials against both environments
+      - name: Diagnose KIS credential injection and endpoint
         env:
           KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
           KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+          KIS_ENV: ${{ secrets.KIS_ENV }}
         run: |
           python - <<'PY'
+          import hashlib
           import os
           import requests
+
+          key = os.environ.get("KIS_APP_KEY", "")
+          secret = os.environ.get("KIS_APP_SECRET", "")
+          env = os.environ.get("KIS_ENV", "")
+
+          def fp(value):
+              return hashlib.sha256(value.encode()).hexdigest()[:12] if value else "EMPTY"
+
+          print(f"KIS_ENV={env!r}")
+          print(f"KIS_APP_KEY: present={bool(key)}, length={len(key)}, sha256_12={fp(key)}")
+          print(f"KIS_APP_SECRET: present={bool(secret)}, length={len(secret)}, sha256_12={fp(secret)}")
+
+          if not key or not secret:
+              raise SystemExit("KIS credentials were not injected into the GitHub Actions process.")
 
           for label, url in [
               ("paper", "https://openapivts.koreainvestment.com:29443/oauth2/tokenP"),
@@ -36,8 +52,8 @@ jobs:
                   headers={"content-type": "application/json"},
                   json={
                       "grant_type": "client_credentials",
-                      "appkey": os.environ["KIS_APP_KEY"],
-                      "appsecret": os.environ["KIS_APP_SECRET"],
+                      "appkey": key,
+                      "appsecret": secret,
                   },
                   timeout=15,
               )
@@ -49,6 +65,7 @@ jobs:
                   code, msg = "", (r.text or "")[:120]
               print(f"KIS {label}: HTTP {r.status_code}, code={code}, msg={msg}")
           PY
+
       - name: Run new snapshot collector
         env:
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
