@@ -86,8 +86,3 @@ def price_history(symbol: str, count: int = Query(60, ge=1, le=120)):
         return {"ok":True,"symbol":symbol,"name":SYMBOLS[symbol],"bars":bars,"closes":list(reversed([b["close"] for b in bars]))}
     except Exception as exc: raise HTTPException(502, f"history unavailable: {exc}") from exc
 
-@app.on_event("startup")
-def startup():
-    # Creates only missing tables; does not write a market snapshot.
-    try: init_tables()
-    except Exception as exc: print(f"[startup] Neon schema check skipped: {exc}")
