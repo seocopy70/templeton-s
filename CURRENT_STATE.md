@@ -1,211 +1,64 @@
 # Templeton S — 현재 작업 상태
 
-최종 갱신: 2026-09-26
+최종 갱신: 2026-09-27
 
 ## 현재 단계
 
-**Phase 3 — 실제 API 연결 및 React 실데이터 검증**
+**Phase 2 — 새 Snapshot + Collector 구축**
 
-## 현재 목표
+## 이번 단계에서 확인한 실제 상태
 
-1. Oracle의 현재 작업본을 보호한다.
-2. React/Vite 흰 화면의 실제 원인을 확인한다.
-3. 기존 Streamlit 수준의 핵심 대시보드를 React로 확보한다.
-4. 검증된 기준본을 GitHub에 저장한다.
-5. 이후 Local VS Code → GitHub → Oracle 흐름으로 전환한다.
+- GitHub main에는 기존 Streamlit/Oracle/React 코드가 함께 존재한다.
+- 기존 src/main.py는 KIS → Score → 로컬 decision log 중심의 기존 실행 진입점이다.
+- scripts/daily_collect.py는 존재하지만 오래된 모듈 참조와 random mock fallback이 있어 운영 수집에 사용하지 않는다.
+- 기존 score_engine.py는 현재 Templeton Score v0.5 계산 기준으로 보존한다.
+- 기존 ai_interpreter.py는 Groq + Llama 3.3 70B를 사용하고 있다.
+- 기존 Neon은 prices_daily / templeton_scores / macro_daily 중심이다.
 
-## 현재 알려진 구조
+## 새 구조 구현 상태
 
-- Oracle 프로젝트: `~/templeton-s/`
-- FastAPI: `:8001`
-- React/Vite: 정적 build
-- Caddy: HTTPS / 정적 파일 / reverse proxy
-- DB: Neon Postgres
-- React public path: `/templeton/`
-- API public path: `/templeton-api/`
-- API systemd service: `templeton-api.service`
+작업 브랜치: rebuild/snapshot-pipeline
 
-## 핵심 운영/데이터 아키텍처 — 2026-09-26 확정
+추가 완료:
+- collector/snapshot.py — 단일 Snapshot 수집 경로
+- collector/ai.py — provider/model 교체 가능한 AI 계층, 현재 Groq 기본
+- collector/panic.py — 동일 Snapshot 기반 Panic Watch 상태 계산
+- scripts/collect_snapshot.py — 새 collector 진입점
+- Neon에 collection_runs / market_snapshots / snapshot_scores / ai_judgments / panic_watch_states 추가
+- AI provider/model/version/prompt/input/output 기록 구조 추가
+- Oracle용 09:30 / 17:00 systemd timer 템플릿 추가
+- 기존 daily collector workflow는 운영 스케줄에서 제거하고 수동 검증용으로 전환
+- snapshot pipeline compile CI 추가
 
-React 재구축 과정에서 데이터 수집·판단·기록 구조를 복잡하게 분산시키지 않고 다음 원칙으로 정리한다.
+## 운영 원칙
 
-### 1. 데이터 수집 주기는 하나로 통일
+앱 실행 → 현재 시황/가격 조회만 수행
 
-평일 **09:30 / 17:00 KST, 하루 2회** Oracle에서 자동 수집한다.
+평일 09:30 / 17:00 KST →
+KIS + FRED/시장 컨텍스트 → Snapshot → Score → AI → Panic Watch → Neon
 
-각 수집 시점에 가능한 범위의 다음 데이터를 하나의 시점 스냅샷으로 기록한다.
+현재 데이터와 가장 최근 정기 Snapshot 판단은 화면/API에서 별도로 표시한다.
 
-- KIS 현재 가격/시장 데이터
-- 기존 Templeton Score 계산에 필요한 데이터
-- FRED 등 매크로 데이터
-- AI 판단에 필요한 관련 시장 컨텍스트
+## 아직 검증하지 않은 것
 
-FRED는 모든 지표가 하루 2회 갱신되는 것은 아니므로, 수집 실행 주기와 실제 관측값 갱신 주기를 구분한다. 동일 값이 반복될 경우에도 관측/업데이트 시점을 명확히 보존한다.
-
-### 2. 앱 실행과 자동 축적은 분리
-
-앱을 열었을 때는 **현재 데이터**를 가져와 현재 상태를 보여준다.
-
-자동 수집은 앱을 열지 않아도 **역사적 데이터와 판단 스냅샷을 축적**하기 위한 것이다.
-
-즉:
-
-```
-앱 실행 → 현재 상태 조회/표시
-09:30·17:00 → 데이터 + 판단 스냅샷 축적
-```
-
-### 3. AI 판단은 데이터 수집과 같은 스냅샷에 기록
-
-각 자동 수집 시점에 당시 데이터로 생성한 AI Guide/판단을 함께 저장한다.
-
-과거 판단을 나중에 다시 생성하지 않고, **당시 실제로 생성된 판단과 그 근거를 보존**하여 이후 실제 결과와 비교할 수 있도록 한다.
-
-AI 판단 검증은 사후에 별도 Outcome 평가로 수행한다.
-
-### 4. 판단 엔진은 크게 두 종류로 분리
-
-**A. AI Guide / 현재 판단**
-
-- 현재 가격·Score·기업/시장/매크로 데이터를 바탕으로 현재 시점의 해석을 기록한다.
-- 당시 판단과 근거를 스냅샷으로 보존한다.
-
-**B. Panic Watch / 공황적 하락 관찰**
-
-- 별도의 데이터 수집 주기를 만들지 않는다.
-- 동일한 하루 2회 Market Snapshot을 계속 누적한다.
-- 하락 사건이 시작되면 여러 관측 시점에 걸쳐 상태를 추적한다.
-- 충분한 관찰 후 실제 가치 훼손과 시장 공포에 의한 가격 하락을 구분하는 보조 판단을 수행한다.
-- 사건의 시작 시점, 중간 관측, 최종 판단을 연결해 보존한다.
-
-### 5. 사후검증은 판단과 분리
-
-AI Guide와 Panic Watch가 당시 무엇을 판단했는지는 변경하지 않는다.
-
-시간이 지난 뒤 실제 가격·펀더멘털·시장 상황을 확인하여:
-
-```
-당시 데이터
-→ 당시 AI 판단
-→ 시간 경과
-→ 실제 결과
-→ 판단 적중 여부/한계 평가
-```
-
-순서로 별도의 사후검증을 수행한다.
-
-### 6. 데이터 파이프라인의 핵심 개념
-
-```
-09:30 / 17:00
-      ↓
-KIS + FRED + 시장/기업 데이터
-      ↓
-Market Snapshot
-      ↓
-기존 Templeton Score 계산
-      ↓
-┌─────────────────┬──────────────────┐
-│ AI Guide        │ Panic Watch      │
-│ 현재 시점 판단   │ 다중 시점 관찰    │
-└────────┬────────┴─────────┬────────┘
-         └──────────┬────────┘
-                    ↓
-                  Neon
-                    ↓
-             장기 사후검증
-```
-
-**중요:** 기존 정상 작동하는 KIS/Score/DB 계산 로직을 불필요하게 재작성하지 않는다. 현재 `scripts/daily_collect.py`는 오래된 모듈 참조와 random mock fallback이 확인되었으므로 검증 없이 Oracle 자동수집에 사용하지 않는다. 기존 정상 로직을 재사용하는 안전한 단일 수집 경로를 먼저 확립한다.
-
-## Neon DB 구조 재정비 방향 — 2026-09-26
-
-현재 Neon은 prices_daily / templeton_scores / macro_daily 중심의 단순 구조이고, 기존 문서의 market_snapshots / judgments 등은 설계 초안 수준이다. 따라서 바로 테이블을 변경하지 않고 실제 Oracle DB의 현재 스키마와 코드 사용처를 먼저 대조한 뒤 단계적으로 재설계한다.
-
-재설계의 기준은 다음과 같다.
-
-- Market Snapshot을 자동 수집의 기준 단위로 둔다. 한 수집 시점의 KIS·시장·기업·FRED 데이터를 연결할 수 있어야 한다.
-- FRED 원자료와 AI 해석을 분리한다. 같은 값이 반복되더라도 실제 수집 시각과 FRED 관측일/값을 구분해 보존한다.
-- AI Guide 판단은 당시 입력 스냅샷과 연결된 불변 기록으로 남긴다. 나중에 판단 문구를 덮어쓰지 않는다.
-- Panic Watch는 별도 수집 테이블이 아니라 여러 Snapshot을 연결하는 사건/상태 기록으로 설계한다.
-- 사후검증 Outcome은 원래 판단과 분리하여 나중에 추가한다.
-- 앱을 열 때마다 기록을 만드는 구조는 사용하지 않는다. 현재 조회에는 데이터 기준시각/신선도(freshness)를 표시한다.
-- 향후 필요하면 사용자가 의도적으로 남기는 수동 현재상태 Snapshot을 별도 기능으로 추가할 수 있지만, 자동 기록과 섞지 않는다.
-- 기존 prices_daily, templeton_scores, macro_daily를 당장 폐기하거나 대량 마이그레이션하지 않는다. 실제 사용처와 과거 데이터 보존 필요성을 확인한 뒤 단계적으로 확장/전환한다.
-
-목표 구조의 개념은 다음과 같다.
-
-collection_run → market_snapshot → raw/context data + score → ai_judgment → panic_event/state → outcome
-
-이 구조는 기록의 재현성을 확보하면서도 앱 조회와 자동 축적을 분리하는 것을 목표로 한다.
-
-## 현재 알려진 문제
-
-React/Oracle 이식 과정에서 일부 기존 문서와 실제 작업본 사이에 차이가 있다. 실제 코드/서버 상태를 우선 확인한다.
-
-## 현재까지 확인된 React 실데이터 상태
-
-- Oracle에서 FastAPI `/scores` 실행 검증 완료: HTTP 200, 6개 종목, 실제 KIS 데이터 및 Templeton Score 반환.
-- 공개 `/templeton/` HTTP 200 및 실제 Vite asset 경로 확인.
-- 공개 `/templeton-api/scores` HTTP 200 확인.
-- `069500` 예시: 현재가 113,145, 등락률 +1.13%, Score 48.8 확인.
-- React Score History의 랜덤 데이터는 제거했고 실제 KIS 가격 History를 연결하는 방향으로 정리 중.
-- 실제 역사적 Templeton Score를 만들려면 당시의 Score 입력 데이터도 함께 축적해야 하며, 단순 가격 History와 혼동하지 않는다.
-
-## GitHub / Oracle 안전 원칙
-
-- Oracle 작업본이 GitHub보다 앞서 있을 가능성이 있으므로 실제 상태를 확인한 뒤 기준본을 확립한다.
-- reset / force push / 대량 삭제를 하지 않는다.
-- `db/neon_client.py`의 별도 Oracle 변경은 원인/필요성을 확인하기 전 GitHub main에 덮어쓰지 않는다.
-- backup 파일, `data/decisions.jsonl` 등 검증되지 않은 작업 파일을 자동으로 커밋하지 않는다.
+- GitHub CI 실제 성공
+- 실제 KIS/FRED/Groq/Neon을 이용한 end-to-end Snapshot 생성
+- Oracle에 새 collector를 설치/활성화
+- 09:30 / 17:00 실제 자동 실행
+- 새 FastAPI/React 연결
 
 ## 다음 작업
 
-1. Oracle의 실제 데이터 수집 경로와 `src/main.py`를 확인한다.
-2. 기존 GitHub Actions의 수집 기능을 분석하되, 오래된/위험한 `daily_collect.py`를 그대로 배치하지 않는다.
-3. **09:30 / 17:00 단일 수집 파이프라인**을 실제 KIS + 기존 Score 로직 + FRED/매크로 데이터와 연결한다.
-4. AI Guide 판단을 수집 스냅샷과 함께 저장하는 최소 구조를 확정한다.
-5. Panic Watch는 동일 스냅샷의 누적 상태를 이용하는 별도 판단 엔진으로 설계한다.
-6. 데이터/판단 기록이 쌓인 뒤 사후검증 구조를 연결한다.
-7. 그 이후 React 화면에서 현재 상태와 축적 기록을 필요한 범위만 표시한다.
+1. 새 collector CI/실행 검증
+2. Neon end-to-end Snapshot 1회 생성 확인
+3. FastAPI를 현재 데이터 + 최근 Snapshot 판단 조회 구조로 재작성
+4. React 새 화면 구현
+5. 통합 테스트 후 GitHub main 기준본 확정
+6. Oracle 기존 실행체계를 새 코드로 교체
+7. 09:30 / 17:00 자동수집 실제 검증
 
-## 기록 원칙
+## 안전
 
-이 파일에는 작업 연속성에 필요한 최소한의 내용만 기록한다.
-
-각 주요 단계가 끝날 때 다음만 갱신한다.
-- 현재 단계
-- 완료한 작업
-- 현재 문제
-- 다음 작업
-
-문서 자체를 만드는 것이 목적이 아니다.
-
-## AI 판단 모델 운영 원칙 — 2026-09-27 확정
-
-AI 모델은 지금 당장 특정 메이저 모델로 교체하는 것을 우선하지 않는다.
-
-현재 코드의 실제 AI 연동은 **Groq API + Llama 3.3 70B**이며, 여기서 Groq은 xAI의 Grok과 다른 서비스다. 현재 모델은 향후 교체 대상이므로 신규 파이프라인에서는 모델명을 코드 전반에 하드코딩하지 않고 **AI provider/model을 교체 가능한 계층**으로 분리한다.
-
-우선순위는 다음과 같다.
-
-1. **데이터 수집 → Market Snapshot → Templeton Score → AI 판단 → Neon 기록**의 안정적인 자동화 구축
-2. AI 판단 입력/출력/모델/provider/version을 함께 보존하여 나중에 재현·비교 가능하게 만들기
-3. 무료 사용 가능한 최신 모델을 우선 후보로 삼되, 특정 모델을 영구 고정하지 않기
-4. 동일한 Snapshot에 여러 모델을 적용할 수 있는 비교 구조를 준비하고, 충분한 데이터가 쌓이면 실제 사후 Outcome으로 판단 품질을 비교
-5. 필요성이 확인될 때 xAI **Grok 최신 모델** 또는 OpenAI/Claude 등의 유료/별도 API를 실험 대상으로 추가
-
-모델 변경의 기준은 단순한 명성이나 체감 성능이 아니라 **Templeton의 실제 판단 품질**로 한다.
-
-비교할 때는 동일한 입력 Snapshot과 동일한 판단 규칙을 사용하여 모델별:
-- 판단 방향
-- 근거의 적합성
-- 위험 신호 포착
-- 판단 변경 조건의 구체성
-- 이후 실제 결과와의 일치/한계
-
-를 축적한다.
-
-따라서 현재 작업에서는 **Groq→Grok 교체를 먼저 진행하지 않는다.** AI provider/model abstraction과 비교 가능한 기록 구조를 먼저 확보하고, 실제 데이터가 쌓인 뒤 모델 변경 여부를 결정한다.
-
-이 항목은 이후 AI 판단 파이프라인 구현 시 반드시 반영할 다음 작업이다.
+- reset / force push / 대량 삭제 금지
+- 기존 코드와 DB는 검증 전 폐기하지 않는다.
+- 실제 코드/서버 상태를 문서보다 우선한다.
