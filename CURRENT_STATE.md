@@ -4,7 +4,7 @@
 
 ## 현재 단계
 
-**Phase 0 — 현재 상태 확인 및 작업본 보호**
+**Phase 3 — 실제 API 연결 및 React 실데이터 검증**
 
 ## 현재 목표
 
@@ -176,3 +176,17 @@ React에서 Score를 다시 계산하지 않는다.
 - **검증 제한:** 현재 Oracle의 `api/main.py`와 `frontend/`는 아직 GitHub main에 없는 별도 작업본이므로, 이번 세션에서는 실제 Oracle 서버에 새 API를 배포하거나 공개 URL에서 실데이터 응답을 확인할 수 없었다. 따라서 API 구현은 GitHub 기준본에 반영했지만 '실행 검증 완료'로 기록하지 않는다.
 - React `App.jsx`도 Oracle 작업본에만 존재하는 상태이므로, 현재는 기존 화면 코드를 덮어쓰지 않았다. 다음 서버 접근/동기화 단계에서 실제 React 코드에 API 응답을 연결하고 공개 URL에서 검증한다.
 - **판정:** API adapter 구현 PASS(코드 반영), 실행/실데이터 검증 OPEN.
+
+
+## 2026-09-26 최신 진행 기준 — Oracle API 실데이터 연결 확인
+
+- Oracle에서 FastAPI `/scores` 실행 검증 완료: `HTTP 200`, 응답 타입 `list`, 6개 종목, 첫 종목 `069500`, 첫 Score `48.8`.
+- 초기 `/scores` 500 원인은 FastAPI 반환 타입 annotation이 실제 반환값과 불일치한 것(`dict[str, Any]` 선언 vs `list[dict[str, Any]]` 반환)이었음. Oracle에서 타입 선언을 `list[dict[str, Any]]`로 수정하고 재검증하여 해결.
+- `/prices`에서도 KIS 실데이터와 기존 Score 계산 결과가 정상 반환됨. 따라서 KIS → 기존 Python 계산 → FastAPI 흐름은 실제 Oracle에서 동작하는 것으로 확인.
+- React `frontend/src/App.jsx`에 `normalizeScoreRow()` adapter를 추가하여 실제 API 필드(`symbol`, `current_price`, `change_rate`, `low_52w`, `score.total/components`)를 기존 화면 데이터 구조로 변환하도록 수정.
+- React의 `/scores` fetch도 기존 mock merge 방식에서 `setTickers(d.map(normalizeScoreRow))` 방식으로 변경됨.
+- React 코드 수정 전 `frontend/src/App.jsx.before-real-scores` 백업을 생성함. API 타입 수정 전에도 `api/main.py.before-scores-type-fix` 백업을 생성함.
+- **현재 미완료:** React 빌드 및 공개 `/templeton/` 화면에서 실제 점수가 표시되는지 검증하지 않음.
+- **현재 주의:** `mockTickers`와 랜덤 `generateHistory()`는 아직 코드에 남아 있음. 따라서 Score History는 실제 데이터가 아니며, 실제 화면 검증 후 제거/대체 여부를 결정해야 함. mock-only 설명/수치가 실제 데이터와 섞이지 않도록 다음 단계에서 정리.
+- Oracle의 `db/neon_client.py`에는 React 이식과 직접 관계없는 별도 변경이 있으므로, 원인/필요성이 확인되기 전에는 GitHub main에 덮어쓰지 않음.
+- **다음 작업:** (1) `frontend`에서 `npm run build` 성공 확인 → (2) Caddy가 제공하는 공개 `/templeton/`에서 실제 API 점수/가격 표시 확인 → (3) 브라우저 오류 및 API 호출 검증 → (4) 랜덤 Score History 처리 → (5) 검증된 Oracle 변경만 GitHub 기준본으로 반영.
