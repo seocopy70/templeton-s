@@ -104,7 +104,16 @@ def health() -> dict[str, Any]:
 @app.get("/scores")
 def scores(force: bool = Query(False)) -> dict[str, Any]:
     try:
-        return {"ok": True, "items": _get_scores(force=force)}
+        return _get_scores(force=force)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"market data unavailable: {exc}") from exc
+
+
+@app.get("/prices")
+def prices(force: bool = Query(False)) -> list[dict[str, Any]]:
+    """Compatibility endpoint for the current React prototype."""
+    try:
+        return _get_scores(force=force)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"market data unavailable: {exc}") from exc
 
@@ -142,7 +151,7 @@ def market_overview(force: bool = Query(False)) -> dict[str, Any]:
         data = fetch_market_overview(_client)
         _market_cache["data"] = data
         _market_cache["expires"] = now + _CACHE_SECONDS
-        return {"ok": True, "items": data}
+        return data
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"market overview unavailable: {exc}") from exc
 
