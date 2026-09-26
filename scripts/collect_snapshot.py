@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 """Run one production snapshot. Intended for Oracle systemd timer/cron."""
 from __future__ import annotations
+
 import argparse
+import sys
+from pathlib import Path
+
+# Allow direct execution as: python scripts/collect_snapshot.py
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from collector.snapshot import run_collection
 
 parser = argparse.ArgumentParser()
