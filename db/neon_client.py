@@ -183,6 +183,38 @@ def insert_panic_state(snapshot_id: str, symbol: str, state: dict[str, Any]) -> 
         conn.commit()
 
 
+def latest_snapshot() -> dict[str, Any] | None:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("select snapshot_id,run_id,captured_at,market_data,macro_data from market_snapshots order by captured_at desc limit 1")
+            row = cur.fetchone()
+    if not row:
+        return None
+    return {"snapshot_id": str(row[0]), "run_id": str(row[1]), "captured_at": row[2].isoformat(), "market_data": row[3], "macro_data": row[4]}
+
+
+def latest_judgments() -> list[dict[str, Any]]:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""select j.symbol,j.provider,j.model,j.model_version,j.prompt_version,j.input_data,j.output_data,j.created_at
+                          from ai_judgments j join market_snapshots s on s.snapshot_id=j.snapshot_id
+                          where s.snapshot_id=(select snapshot_id from market_snapshots order by captured_at desc limit 1)
+                          order by j.symbol""")
+            rows = cur.fetchall()
+    return [{"symbol": r[0], "provider": r[1], "model": r[2], "model_version": r[3], "prompt_version": r[4], "input": r[5], "output": r[6], "created_at": r[7].isoformat()} for r in rows]
+
+
+def latest_panic_states() -> list[dict[str, Any]]:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""select p.symbol,p.status,p.state_data,p.created_at
+                          from panic_watch_states p join market_snapshots s on s.snapshot_id=p.snapshot_id
+                          where s.snapshot_id=(select snapshot_id from market_snapshots order by captured_at desc limit 1)
+                          order by p.symbol""")
+            rows = cur.fetchall()
+    return [{"symbol": r[0], "status": r[1], "state": r[2], "created_at": r[3].isoformat()} for r in rows]
+
+
 # Legacy compatibility -----------------------------------------------------
 def upsert_prices(rows):
     sql = """insert into prices_daily (date, code, close, volume) values %s
