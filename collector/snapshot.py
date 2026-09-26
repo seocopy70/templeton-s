@@ -22,7 +22,7 @@ from score_engine import calculate_templeton_score, MARKET_BENCHMARK_SYMBOL
 from db.neon_client import (
     begin_collection_run, finish_collection_run, insert_snapshot,
     insert_score, insert_ai_judgment, insert_panic_state,
-    latest_panic_state,
+    latest_panic_state, init_tables,
 )
 from .ai import get_provider, PROMPT_VERSION
 from .panic import evaluate
@@ -46,6 +46,7 @@ def _macro_snapshot() -> dict[str, Any]:
 
 def run_collection(slot: str | None = None) -> str:
     validate_config()
+    init_tables()
     captured_at = datetime.now(timezone.utc)
     run_id = begin_collection_run(slot=slot, captured_at=captured_at)
     try:
