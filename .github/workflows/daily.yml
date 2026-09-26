@@ -1,25 +1,79 @@
-name: Daily Templeton Collect to Neon
+name: Snapshot Pipeline Manual Verification
 
 on:
-  schedule:
-    - cron: '10 7 * * 1-5'  # 07:10 UTC = 16:10 KST 평일
   workflow_dispatch:
+  push:
+    branches:
+      - rebuild/snapshot-pipeline
 
 jobs:
   collect:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
       - run: pip install -r requirements.txt
-      - name: Init & Collect
+
+      - name: Diagnose KIS credential injection and endpoint
+        env:
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+          KIS_ENV: ${{ secrets.KIS_ENV }}
+        run: |
+          python - <<'PY'
+          import hashlib
+          import os
+          import requests
+
+          key = os.environ.get("KIS_APP_KEY", "")
+          secret = os.environ.get("KIS_APP_SECRET", "")
+          env = os.environ.get("KIS_ENV", "")
+
+          def fp(value):
+              return hashlib.sha256(value.encode()).hexdigest()[:12] if value else "EMPTY"
+
+          print(f"KIS_ENV={env!r}")
+          print(f"KIS_APP_KEY: present={bool(key)}, length={len(key)}, sha256_12={fp(key)}")
+          print(f"KIS_APP_SECRET: present={bool(secret)}, length={len(secret)}, sha256_12={fp(secret)}")
+
+          if not key or not secret:
+              raise SystemExit("KIS credentials were not injected into the GitHub Actions process.")
+
+          for label, url in [
+              ("paper", "https://openapivts.koreainvestment.com:29443/oauth2/tokenP"),
+              ("real", "https://openapi.koreainvestment.com:9443/oauth2/tokenP"),
+          ]:
+              r = requests.post(
+                  url,
+                  headers={"content-type": "application/json"},
+                  json={
+                      "grant_type": "client_credentials",
+                      "appkey": key,
+                      "appsecret": secret,
+                  },
+                  timeout=15,
+              )
+              try:
+                  body = r.json()
+                  code = body.get("msg_cd") or body.get("error_code") or ""
+                  msg = body.get("msg1") or body.get("error_description") or ""
+              except Exception:
+                  code, msg = "", (r.text or "")[:120]
+              print(f"KIS {label}: HTTP {r.status_code}, code={code}, msg={msg}")
+          PY
+
+      - name: Run new snapshot collector
         env:
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
           KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+          KIS_ENV: ${{ secrets.KIS_ENV }}
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-        run: |
-          python db/neon_client.py
-          python scripts/daily_collect.py
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_MODEL: llama-3.3-70b-versatile
+          AI_PROVIDER: groq
+        run: python scripts/collect_snapshot.py

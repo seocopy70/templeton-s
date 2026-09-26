@@ -1,0 +1,10 @@
+[Unit]
+Description=Templeton S scheduled snapshot collection
+
+[Timer]
+OnCalendar=Mon..Fri 09:30:00 Asia/Seoul
+Persistent=true
+Unit=templeton-s-collector@09:30.service
+
+[Install]
+WantedBy=timers.target

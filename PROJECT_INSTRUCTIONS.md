@@ -1,39 +1,37 @@
 # Templeton S 작업 지침
 
-### 현재 프로젝트 사용 목적
+## 현재 작업 목적
 
-이 프로젝트의 본래 목적은 **「투자와 성공」과 관련된 아이디어를 만들고 논의하는 것**이다.
+기존 Streamlit을 기능적 기준으로 삼아 Templeton S의 새 운영 시스템을 구축하고 Oracle에서 새 코드로 교체한다.
 
-현재는 일시적으로 `Templeton S` 앱의 React 이식 및 Oracle Cloud 배포 작업을 진행하기 위해 이 프로젝트를 사용한다.
+핵심 흐름:
 
-Templeton S 이식 작업이 완료되면 이 임시 지침과 관련 문서 운영 규칙을 제거하고, 프로젝트를 원래 목적에 맞게 되돌린다.
+Streamlit 기능 기준 → 새 Collector → Market Snapshot → Score → AI Judgment → Panic Watch → Neon → FastAPI → React → GitHub 검증 → Oracle 배포
 
-이 기간에도 문서화 자체가 목적이 되지 않도록 하며, **실제 작업의 연속성을 유지하는 데 필요한 최소한의 기록만 남긴다.**
+## 원칙
 
-### Templeton S 작업 연속성 지침
+- 기존 Oracle src/main.py와 기존 React를 새 구조의 기준으로 삼지 않는다.
+- 검증된 Templeton Score 계산 로직과 Streamlit의 기능은 보존한다.
+- 기존 코드를 살릴지 고민하는 것보다 새 구조 구현을 우선한다.
+- scripts/daily_collect.py는 random mock/오래된 모듈 참조 때문에 운영 수집에 사용하지 않는다.
+- reset / force push / 대량 삭제 금지.
+- 작은 단위로 구현하고 각 단계에서 실제 코드와 실행 상태를 검증한다.
 
-Templeton S 프로젝트의 작업을 시작할 때마다 GitHub 레포의 다음 3개 문서를 먼저 확인한다.
+## 데이터 동작
 
-1. `PROJECT_INSTRUCTIONS.md`
-2. `MIGRATION_PLAN.md`
-3. `CURRENT_STATE.md`
+- Oracle은 24/7 실행한다.
+- 평일 09:30 / 17:00 KST에 자동 수집한다.
+- 수집 시 Snapshot → Score → AI 판단 → Panic Watch → Neon 저장.
+- 앱 실행 시에는 현재 시황/가격을 조회해 표시하지만 새 Snapshot이나 AI 판단을 생성하지 않는다.
+- 화면에는 현재 데이터의 기준 시각과 최근 정기 Snapshot의 판단 시각을 구분한다.
+- 사후검증은 당시 Snapshot/판단을 변경하지 않고 별도 Outcome으로 기록한다.
 
-`CURRENT_STATE.md`를 기준으로 현재 작업 단계와 다음 예정 작업을 파악하고, 이미 완료된 작업을 불필요하게 반복하지 않는다.
+## AI
 
-작업 중 중요한 변경이나 단계가 완료되면 `CURRENT_STATE.md`를 간단히 갱신한다.
+현재 실제 연동은 Groq API + Llama 3.3 70B이다. Groq과 xAI Grok을 혼동하지 않는다.
 
-기본 원칙:
-- 실제 코드와 서버 상태를 문서보다 우선하여 확인한다.
-- 문서와 실제 상태가 다르면 실제 상태를 확인한 뒤 `CURRENT_STATE.md`를 수정한다.
-- 한 번에 큰 변경을 하지 않고 작은 단위로 수정하고 검증한다.
-- 기존에 정상 작동하는 백엔드, DB, 계산 로직은 React 이식 과정에서 불필요하게 변경하지 않는다.
-- 문제 발생 시 원인을 확인하기 전에 구조를 크게 바꾸지 않는다.
-- 작업이 완료되면 다음 작업을 `CURRENT_STATE.md`에 명확히 남긴다.
-- React 이식 작업이 완료된 이후에는 이 문서 체계를 최소한의 유지보수 기록으로만 사용한다.
+신규 구조에서는 provider/model/version/input/output을 기록하고 provider를 교체 가능한 계층으로 둔다. 지금은 Groq을 유지하고, 데이터가 쌓인 뒤 동일 Snapshot에 여러 모델을 적용해 실제 Outcome으로 비교한다.
 
-### 핵심 원칙
+## 작업 진행
 
-**새 창에서 시작할 때 → 3개 문서 확인 → CURRENT_STATE의 다음 작업부터 계속한다.**
-
-문서 기록 자체가 목적이 아니다.  
-**작업의 연속성을 확보하고 길을 잃지 않는 것이 목적이다.**
+현재는 새 Snapshot/Collector의 최소 운영 경로를 먼저 완성한다. 이후 FastAPI/React, 통합 테스트, GitHub 기준본 확정, Oracle 교체 및 실제 09:30/17:00 검증 순으로 진행한다.
