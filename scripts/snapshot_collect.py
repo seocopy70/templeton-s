@@ -11,6 +11,7 @@ import argparse
 import json
 import os
 import sys
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -80,7 +81,7 @@ def main() -> int:
 
         with conn.cursor() as cur:
             cur.execute(
-                "select id,status from collection_runs where slot_key=%s",
+                "select run_id,status,snapshot_id from collection_runs where slot=%s",
                 (key,),
             )
             existing = cur.fetchone()
@@ -89,17 +90,22 @@ def main() -> int:
                 return 0
             if existing:
                 run_id = existing[0]
+                snapshot_id = existing[2]
                 cur.execute(
-                    "update collection_runs set started_at=now(), status='running', error=null where id=%s",
-                    (run_id,),
+                    """update collection_runs
+                       set captured_at=%s, completed_at=null, status='running', error=null
+                       where run_id=%s""",
+                    (captured_at, run_id),
                 )
             else:
+                run_id = uuid.uuid4()
+                snapshot_id = uuid.uuid4()
                 cur.execute(
-                    """insert into collection_runs(slot_key,source,environment)
-                       values(%s,'oracle_cron',%s) returning id""",
-                    (key, KIS_ENV),
+                    """insert into collection_runs(
+                         run_id,slot,captured_at,status,snapshot_id
+                       ) values(%s,%s,%s,'running',%s)""",
+                    (run_id, key, captured_at, snapshot_id),
                 )
-                run_id = cur.fetchone()[0]
         conn.commit()
 
         client = KISClient()
@@ -171,51 +177,44 @@ def main() -> int:
         ranks = {x["code"]: x for x in rank_opportunities(results)}
 
         coach = get_coach()
-        snapshot_rows = []
+        market_data = {
+            "stocks": results,
+            "benchmark": benchmark,
+            "market_regime": regime.regime,
+            "benchmark_change_rate": benchmark_chg,
+        }
+        macro_data = {
+            "captured_at_kst": now_kst.isoformat(),
+            "source": "oracle_snapshot_collector",
+        }
+
+        with conn.cursor() as cur:
+            cur.execute(
+                """insert into market_snapshots(
+                     snapshot_id,run_id,captured_at,market_data,macro_data
+                   ) values(%s,%s,%s,%s,%s)
+                   on conflict(snapshot_id) do update set
+                     captured_at=excluded.captured_at,
+                     market_data=excluded.market_data,
+                     macro_data=excluded.macro_data""",
+                (snapshot_id, run_id, captured_at,
+                 Json(market_data), Json(macro_data)),
+            )
+        conn.commit()
+        print(f"[snapshot] stored market snapshot={snapshot_id}")
+
+        coach = get_coach()
         for r in results:
             score = r["score"]
-            comp = score.get("components") or {}
-            panic = r["panic"] or {}
             rank = ranks.get(r["code"]) or {}
-            payload = {
-                "price_data": r["price"], "financial": r["financial"],
-                "closes": r["closes"], "score_data": score,
-                "events": r["events"], "event_trigger": r["event_trigger"],
-                "volatility_annual": r["volatility_annual"],
-                "momentum_20d": r["momentum_20d"],
-                "drop_from_52w_high": r["drop_from_52w_high"],
-                "benchmark": benchmark, "market_regime": regime.regime,
-                "panic": panic,
-            }
-            with conn.cursor() as cur:
-                cur.execute(
-                    """insert into market_snapshots(
-                       run_id,captured_at,captured_at_kst,code,name,price,change_rate,
-                       score,opinion,value,price_score,pessimism,quality,growth,risk,
-                       market_regime,panic_type,opportunity_rank,opportunity_score,payload)
-                       values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                       on conflict(run_id,code) do update set
-                       captured_at=excluded.captured_at,captured_at_kst=excluded.captured_at_kst,
-                       price=excluded.price,change_rate=excluded.change_rate,score=excluded.score,
-                       opinion=excluded.opinion,value=excluded.value,price_score=excluded.price_score,
-                       pessimism=excluded.pessimism,quality=excluded.quality,growth=excluded.growth,
-                       risk=excluded.risk,market_regime=excluded.market_regime,panic_type=excluded.panic_type,
-                       opportunity_rank=excluded.opportunity_rank,opportunity_score=excluded.opportunity_score,
-                       payload=excluded.payload
-                       returning id""",
-                    (run_id,captured_at,now_kst.isoformat(),r["code"],r["name"],
-                     r["price"].get("current_price"),r["price"].get("change_rate"),
-                     score.get("total"),score.get("opinion"),comp.get("value"),comp.get("price"),
-                     comp.get("pessimism"),comp.get("quality"),comp.get("growth"),comp.get("risk"),
-                     regime.regime,panic.get("type"),rank.get("opportunity_rank"),
-                     rank.get("opportunity_score"),Json(payload)),
-                )
-                snapshot_id = cur.fetchone()[0]
-
+            panic = r["panic"] or {}
             try:
                 ai = coach.generate_comment(
                     r["name"], r["code"], score, score.get("opinion") or "",
-                    market_ctx=f"시장모드: {regime.regime}, 벤치마크 변동률: {benchmark_chg}%",
+                    market_ctx=(
+                        f"시장모드: {regime.regime}, "
+                        f"벤치마크 변동률: {benchmark_chg}%"
+                    ),
                     events=r["events"],
                 )
                 status = "completed"
@@ -228,37 +227,64 @@ def main() -> int:
             conditions = build_change_conditions(
                 r["name"], score, r["price"].get("current_price")
             )
+            output_data = {
+                "status": status,
+                "comment": ai.get("comment"),
+                "positives": ai.get("positives") or [],
+                "negatives": ai.get("negatives") or [],
+                "counter_argument": ai.get("counter_argument"),
+                "change_conditions": conditions,
+                "error": err,
+            }
+            input_data = {
+                "name": r["name"], "code": r["code"], "score": score,
+                "price": r["price"], "market_regime": regime.regime,
+                "benchmark_change_rate": benchmark_chg, "events": r["events"],
+                "panic": panic,
+                "opportunity_rank": rank.get("opportunity_rank"),
+                "opportunity_score": rank.get("opportunity_score"),
+            }
             with conn.cursor() as cur:
                 cur.execute(
                     """insert into ai_judgments(
-                       snapshot_id,provider,model,status,comment,positives,negatives,
-                       counter_argument,change_conditions,raw_response,error)
-                       values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                       on conflict(snapshot_id,provider,model) do update set
-                       status=excluded.status,generated_at=now(),comment=excluded.comment,
-                       positives=excluded.positives,negatives=excluded.negatives,
-                       counter_argument=excluded.counter_argument,
-                       change_conditions=excluded.change_conditions,
-                       raw_response=excluded.raw_response,error=excluded.error""",
-                    (snapshot_id,PROVIDER,MODEL,status,ai.get("comment"),
-                     Json(ai.get("positives") or []),Json(ai.get("negatives") or []),
-                     ai.get("counter_argument"),Json(conditions),
-                     ai.get("raw_response"),err),
-                )
-                cur.execute(
-                    """insert into panic_events(snapshot_id,panic_type,market_regime,details)
-                       values(%s,%s,%s,%s)
-                       on conflict(snapshot_id) do update set
-                       panic_type=excluded.panic_type,market_regime=excluded.market_regime,
-                       details=excluded.details""",
-                    (snapshot_id,panic.get("type") or "none",regime.regime,Json(panic)),
+                         snapshot_id,symbol,provider,model,model_version,
+                         prompt_version,input_data,output_data
+                       ) values(%s,%s,%s,%s,%s,%s,%s,%s)""",
+                    (snapshot_id, r["code"], PROVIDER, MODEL, MODEL,
+                     "templeton-snapshot-v1", Json(input_data), Json(output_data)),
                 )
             conn.commit()
-            print(f"[snapshot] stored {r['code']} snapshot={snapshot_id} ai={status}")
+            print(f"[snapshot] stored {r['code']} ai={status}")
+
+        panic_types = [((r.get("panic") or {}).get("type") or "none") for r in results]
+        active_panics = [p for p in panic_types if p != "none"]
+        with conn.cursor() as cur:
+            cur.execute(
+                """insert into panic_events(
+                     snapshot_id,panic_type,market_regime,details
+                   ) values(%s,%s,%s,%s)
+                   on conflict(snapshot_id) do update set
+                     panic_type=excluded.panic_type,
+                     market_regime=excluded.market_regime,
+                     details=excluded.details""",
+                (snapshot_id, active_panics[0] if active_panics else "none",
+                 regime.regime,
+                 Json({
+                     "types": panic_types,
+                     "stocks": [
+                         {"code": r["code"], "name": r["name"],
+                          "panic": r.get("panic") or {}}
+                         for r in results
+                     ],
+                 })),
+            )
+        conn.commit()
 
         with conn.cursor() as cur:
             cur.execute(
-                "update collection_runs set finished_at=now(),status='completed' where id=%s",
+                """update collection_runs
+                   set completed_at=now(),status='completed',error=null
+                   where run_id=%s""",
                 (run_id,),
             )
         conn.commit()
@@ -270,7 +296,9 @@ def main() -> int:
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "update collection_runs set finished_at=now(),status='failed',error=%s where id=%s",
+                    """update collection_runs
+                       set completed_at=now(),status='failed',error=%s
+                       where run_id=%s""",
                     (str(e)[:2000], run_id),
                 )
             conn.commit()
