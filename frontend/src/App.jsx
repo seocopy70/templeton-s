@@ -496,8 +496,8 @@ function AIJudgment({ judgment }) {
       </summary>
       {judgment.comment && <p className="ai-comment">{judgment.comment}</p>}
       <div className="ai-columns">
-        <div><b className="ai-positive">긍정</b>{positives.length ? <ul>{positives.slice(0,3).map((x,i)=><li key={i}>{x}</li></ul>) : <p>—</p>}</div>
-        <div><b className="ai-negative">주의</b>{negatives.length ? <ul>{negatives.slice(0,3).map((x,i)=><li key={i}>{x}</li></ul>) : <p>—</p>}</div>
+        <div><b className="ai-positive">긍정</b>{positives.length ? <ul>{positives.slice(0,3).map((x,i)=><li key={i}>{x}</li>)}</ul> : <p>—</p>}</div>
+        <div><b className="ai-negative">주의</b>{negatives.length ? <ul>{negatives.slice(0,3).map((x,i)=><li key={i}>{x}</li>)}</ul> : <p>—</p>}</div>
       </div>
       {judgment.counter_argument && <div className="ai-sub"><b>반대 논거</b><span>{judgment.counter_argument}</span></div>}
       {conditions.length > 0 && <div className="ai-sub"><b>판단 변경 조건</b><span>{conditions.slice(0,2).join(" · ")}</span></div>}
