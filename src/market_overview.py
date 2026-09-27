@@ -95,6 +95,83 @@ def _yahoo_quote_and_closes(symbol: str, days: int = 30) -> Optional[dict[str, A
         return None
 
 
+def _yahoo_live_quote(symbol: str) -> Optional[dict[str, Any]]:
+    """Fast current quote for the one-minute dashboard ticker."""
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+    params = {"interval": "1m", "range": "1d"}
+    headers = {"User-Agent": "Mozilla/5.0 TempletonS/1.0"}
+    try:
+        resp = requests.get(url, params=params, headers=headers, timeout=5)
+        resp.raise_for_status()
+        data = resp.json()
+        result = (data.get("chart") or {}).get("result") or []
+        if not result:
+            return None
+        meta = result[0].get("meta") or {}
+        price = meta.get("regularMarketPrice")
+        prev = meta.get("chartPreviousClose") or meta.get("previousClose")
+        if price is None:
+            quotes = ((result[0].get("indicators") or {}).get("quote") or [{}])
+            closes = quotes[0].get("close") or []
+            price = next((float(v) for v in reversed(closes) if v is not None), None)
+        change_rate = None
+        if price is not None and prev not in (None, 0):
+            change_rate = (float(price) / float(prev) - 1.0) * 100.0
+        return {"price": float(price) if price is not None else None,
+                "change_rate": round(change_rate, 2) if change_rate is not None else None,
+                "source": "yahoo-live"}
+    except Exception as e:
+        logger.warning("Yahoo live %s 실패: %s", symbol, e)
+        return None
+
+
+def fetch_market_live(client: Optional[KISClient] = None) -> list[dict[str, Any]]:
+    """Fetch current market quotes only; no daily history and no score calculation."""
+    if client is None:
+        client = KISClient()
+
+    def korea(name: str, code: str) -> dict[str, Any]:
+        q = _kis_index(client, code)
+        return {"key": name, "name": name, "region": "KR",
+                "price": q.get("price") if q else None,
+                "change_rate": q.get("change_rate") if q else None,
+                "source": q.get("source") if q else None,
+                "ok": bool(q and q.get("price") is not None)}
+
+    def global_quote(name: str, symbol: str) -> dict[str, Any]:
+        q = _yahoo_live_quote(symbol)
+        return {"key": name, "name": name, "region": "JP" if name == "Nikkei225" else "US",
+                "price": q.get("price") if q else None,
+                "change_rate": q.get("change_rate") if q else None,
+                "source": q.get("source") if q else None,
+                "ok": bool(q and q.get("price") is not None)}
+
+    tasks = [
+        ("KOSPI", lambda: korea("KOSPI", "0001")),
+        ("KOSDAQ", lambda: korea("KOSDAQ", "1001")),
+        ("S&P500", lambda: global_quote("S&P500", "^GSPC")),
+        ("NASDAQ", lambda: global_quote("NASDAQ", "^IXIC")),
+        ("Nikkei225", lambda: global_quote("Nikkei225", "^N225")),
+        ("KODEX200", lambda: {
+            "key": "KODEX200", "name": "KODEX 200", "region": "KR",
+            "price": (q := client.get_current_price("069500")).get("current_price"),
+            "change_rate": q.get("change_rate"), "source": "kis",
+            "ok": q.get("current_price") is not None}),
+    ]
+    results: dict[str, dict[str, Any]] = {}
+    with ThreadPoolExecutor(max_workers=len(tasks)) as executor:
+        futures = {executor.submit(fn): key for key, fn in tasks}
+        for future in as_completed(futures):
+            key = futures[future]
+            try:
+                results[key] = future.result()
+            except Exception as exc:
+                logger.warning("market live %s 실패: %s", key, exc)
+                results[key] = {"key": key, "name": key, "region": "KR" if key in ("KOSPI", "KOSDAQ", "KODEX200") else "US",
+                                "price": None, "change_rate": None, "source": None, "ok": False}
+    return [results[k] for k in ["KOSPI", "KOSDAQ", "KODEX200", "S&P500", "NASDAQ", "Nikkei225"]]
+
+
 def _kis_index(client: KISClient, index_code: str) -> Optional[dict[str, Any]]:
     """국내 업종 현재가. TR: FHPUP02100000 계열 — 환경에 따라 경로 상이할 수 있음."""
     token = client._get_token()
