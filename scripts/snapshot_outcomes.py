@@ -119,13 +119,16 @@ def main() -> int:
 
                     with conn.cursor() as cur:
                         cur.execute("""
-                            select output_data
+                            select input_data, output_data
                             from ai_judgments
                             where snapshot_id=%s and symbol=%s
                             order by created_at desc limit 1
                         """, (snapshot_id, symbol))
                         ai_row = cur.fetchone()
-                        ai_output = (ai_row[0] if ai_row else {}) or {}
+                        ai_input = (ai_row[0] if ai_row else {}) or {}
+                        ai_output = (ai_row[1] if ai_row else {}) or {}
+                        ai_opinion = ((ai_input.get("score") or {}).get("opinion")
+                                      or ai_output.get("opinion"))
 
                         result = {
                             "symbol": symbol,
@@ -133,7 +136,7 @@ def main() -> int:
                             "captured_date": captured_date.isoformat(),
                             "target_date": target_date.isoformat(),
                             "evaluation_date": future.get("date"),
-                            "ai_opinion": ai_output.get("opinion"),
+                            "ai_opinion": ai_opinion,
                             "return_class": classify_return(return_pct),
                             "relative_to_benchmark": (
                                 "outperform"
