@@ -30,6 +30,13 @@ def db():
     return psycopg2.connect(url)
 
 
+def ensure_schema(conn):
+    sql = (ROOT / "db" / "snapshot_schema.sql").read_text(encoding="utf-8")
+    with conn.cursor() as cur:
+        cur.execute(sql)
+    conn.commit()
+
+
 def first_bar_on_or_after(bars: list[dict[str, Any]], target: date):
     candidates = []
     for bar in bars:
@@ -54,6 +61,7 @@ def main() -> int:
     conn = db()
     client = KISClient()
     try:
+        ensure_schema(conn)
         with conn.cursor() as cur:
             cur.execute("""
                 select snapshot_id, captured_at, market_data
