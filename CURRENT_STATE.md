@@ -69,28 +69,39 @@
 - 평일 18:30 KST 자동 평가 cron 등록
 - Oracle /snapshot-outcomes API 정상 응답 확인
 
-## 2026-09-27 FRED 매크로 Snapshot 연결
+## 2026-09-27 FRED 매크로 연동 완료
 
 - src/fred_client.py 추가
-- FRED_API_KEY를 사용해 다음 최신 관측치를 Snapshot마다 조회:
+- Oracle config/.env의 FRED_API_KEY 확인
+- 실제 FRED API 호출 성공
+- 다음 관측치가 실제 Snapshot에 저장되는 것까지 검증:
   - DGS10: 미국 10년 국채금리
   - DFII10: 미국 10년 실질금리
   - BAA10Y: Baa 회사채-10년 국채 스프레드
   - FEDFUNDS: 연방기금금리
   - CPIAUCSL: 미국 CPI
-- FRED 실패 시 KIS Snapshot 자체는 실패시키지 않고 macro_data.status에 상태를 남김
 - FRED 결과를 market_snapshots.macro_data에 저장
 - 동일 매크로 컨텍스트를 당시 AI 판단의 input_data에도 보존
-- FRED 값은 매 Snapshot 시점에 다시 조회하므로 당시 판단 컨텍스트를 보존
+- FRED 실패 시 KIS Snapshot 자체는 실패시키지 않고 macro_data.status에 상태를 남김
+- 실제 Snapshot 1회 실행 및 Neon read-only 검증 완료
+- 검증된 Snapshot: 8b28bbd5-86a0-4dd3-984a-522a869817d2
+- 검증된 run: 56c22437-24e0-4b97-a691-15af90bf8413
+
+## 현재 운영 상태
+
+- 개발/이식/배포 작업은 완료
+- 현재는 실제 시장 데이터를 자동 축적하면서 Outcome을 기다리는 운영 검증 단계
+- 평일 09:30 / 17:00 KST Snapshot 자동수집
+- 평일 18:30 KST 1/5/20일 Outcome 자동평가
+- 앱 실행은 현재 데이터 조회/표시만 수행하며 Snapshot을 생성하지 않음
+- 추가 기능 개발은 당분간 보류하고 실제 데이터 축적과 성과검증을 우선함
 
 ## 다음 작업
 
-1. Oracle에서 최신 GitHub 코드 pull
-2. FRED 연동 포함 Snapshot을 실제 1회 수동 실행
-3. Neon에서 macro_data 실제 값 확인
-4. AI judgment에 FRED 컨텍스트가 함께 저장됐는지 확인
-5. 문제 없으면 현재 cron으로 자동 축적
-6. 이후 충분한 데이터가 쌓이면 AI 모델 비교/Outcome 분석 및 필요한 UI 연결
+1. 자동수집 cron의 실제 실행 여부 확인
+2. 1/5/20일 horizon 도래 후 snapshot_outcomes 생성 확인
+3. 충분한 데이터 축적 후 AI 판단과 KODEX 200 대비 성과 분석
+4. 필요할 때만 AI 모델 비교 및 관련 UI 확장
 
 ## 기록 원칙
 
