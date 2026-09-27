@@ -25,7 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from config import SYMBOLS
 from kis_client import KISClient
 from market_data import fetch_all_prices
-from market_overview import fetch_market_overview
+from market_overview import fetch_market_overview, fetch_market_live
 from score_engine import calculate_templeton_score
 from decision_log import recent_decisions, decisions_as_table_rows
 from events.dart_client import DartClient
@@ -50,6 +50,7 @@ app.add_middleware(
 _client = KISClient()
 _scores_cache: dict[str, Any] = {"expires": 0.0, "data": None}
 _market_cache: dict[str, Any] = {"expires": 0.0, "data": None}
+_market_live_cache: dict[str, Any] = {"expires": 0.0, "data": None}
 _disclosure_cache: dict[str, Any] = {"expires": 0.0, "data": None}
 _CACHE_SECONDS = 60
 _DISCLOSURE_CACHE_SECONDS = 600
@@ -220,6 +221,23 @@ def market_overview(force: bool = Query(False)) -> dict[str, Any]:
 
 
 
+@app.get("/market-live")
+def market_live() -> dict[str, Any]:
+    """Fast current market quotes for the dashboard; cached for one minute."""
+    now = time.time()
+    if _market_live_cache["data"] is not None and now < _market_live_cache["expires"]:
+        return {"ok": True, "items": _market_live_cache["data"], "cached": True}
+    try:
+        data = fetch_market_live(_client)
+        _market_live_cache["data"] = data
+        _market_live_cache["expires"] = now + 60
+        return {"ok": True, "items": data, "cached": False}
+    except Exception as exc:
+        if _market_live_cache["data"] is not None:
+            return {"ok": True, "items": _market_live_cache["data"], "cached": True, "stale": True}
+        raise HTTPException(status_code=502, detail=f"market live unavailable: {exc}") from exc
+
+
 @app.get("/disclosures")
 def disclosures(
     limit: int = Query(30, ge=1, le=100),
@@ -311,6 +329,11 @@ def ai_judgments(
                 "opinion": opinion,
                 "comment": out.get("comment"),
                 "source": out.get("source"),
+                "positives": out.get("positives") or [],
+                "negatives": out.get("negatives") or [],
+                "counter_argument": out.get("counter_argument"),
+                "change_conditions": out.get("change_conditions") or [],
+                "status": out.get("status"),
                 "created_at": created_at.isoformat() if created_at else None,
                 "captured_at": captured_at.isoformat() if captured_at else None,
             })
