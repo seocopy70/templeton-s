@@ -109,6 +109,61 @@ def health() -> dict[str, Any]:
     return {"status": "ok"}
 
 
+@app.get("/latest-snapshot")
+def latest_snapshot() -> dict[str, Any]:
+    """Return the most recent persisted Snapshot in the same row shape as /scores.
+
+    This is a read-only fast path for initial UI rendering. It does not
+    trigger KIS calls and does not create or modify historical records.
+    """
+    url = os.getenv("NEON_DATABASE_URL")
+    if not url:
+        raise HTTPException(status_code=503, detail="snapshot database unavailable")
+
+    try:
+        with psycopg2.connect(url) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    select snapshot_id, captured_at, market_data
+                    from market_snapshots
+                    order by captured_at desc
+                    limit 1
+                    """
+                )
+                row = cur.fetchone()
+
+        if not row:
+            return {"ok": True, "snapshot_id": None, "captured_at": None, "items": []}
+
+        snapshot_id, captured_at, market_data = row
+        stocks = (market_data or {}).get("stocks") or []
+        items = []
+        for stock in stocks:
+            price = stock.get("price") or {}
+            financial = stock.get("financial") or {}
+            items.append({
+                "symbol": stock.get("code"),
+                "name": stock.get("name") or SYMBOLS.get(stock.get("code"), stock.get("code")),
+                **price,
+                **financial,
+                "closes": stock.get("closes") or [],
+                "volatility_annual": stock.get("volatility_annual"),
+                "momentum_20d": stock.get("momentum_20d"),
+                "drop_from_52w_high": stock.get("drop_from_52w"),
+                "score": stock.get("score"),
+            })
+
+        return {
+            "ok": True,
+            "snapshot_id": str(snapshot_id) if snapshot_id else None,
+            "captured_at": captured_at.isoformat() if captured_at else None,
+            "items": items,
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"latest snapshot unavailable: {exc}") from exc
+
+
 @app.get("/scores")
 def scores(force: bool = Query(False)) -> list[dict[str, Any]]:
     try:
