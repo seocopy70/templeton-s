@@ -434,3 +434,16 @@ footer{margin-top:16px;padding-top:8px}
   .risk-clear{padding:5px 6px;font-size:8px}
   footer{margin-top:10px;font-size:8px}
 }
+
+
+/* 2026-09-27 header/mode clarity */
+.compact-hero{padding-top:8px;padding-bottom:7px}
+.compact-hero p{font-size:10px}
+.market-banner.compact-banner strong{font-size:15px}
+@media(max-width:700px){
+  .compact-hero{padding:3px 2px 5px}
+  .compact-hero p{font-size:8px}
+  .market-banner.compact-banner strong{font-size:14px}
+  .market-banner.compact-banner{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .market-banner.compact-banner>span{font-size:8px;text-align:right}
+}
