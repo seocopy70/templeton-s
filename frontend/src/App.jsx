@@ -552,7 +552,7 @@ function RiskSignals({ rows, panicWatch }) {
 function WatchlistPanel({ rows, selectedSymbol, onSelect }) {
   return (
     <section className="watch-panel panel">
-      <div className="section-heading compact"><div><span className="eyebrow">WATCHLIST</span><h2>관심종목</h2></div><span className="muted">클릭하면 상세 표시</span></div>
+      <div className="section-heading compact"><div><span className="eyebrow">WATCHLIST</span><h2>관심종목</h2></div></div>
       <div className="watch-list">
         {rows.map((row) => {
           const selected = row.symbol === selectedSymbol;
@@ -788,18 +788,6 @@ function App() {
           </div>
         )}
 
-        <section className="hero">
-          <div>
-            <span className="eyebrow">현재 시장 스냅샷</span>
-            <h2>오늘의 Templeton S</h2>
-            <p>{snapshotAt && refreshing ? "최근 저장 Snapshot을 먼저 표시하고 현재 데이터를 갱신합니다. 조회 자체가 역사적 기록을 생성하지는 않습니다." : "앱을 열면 현재 데이터를 조회합니다. 조회 자체가 역사적 기록을 생성하지는 않습니다."}</p>
-          </div>
-          <div className="hero-meta">
-            <span>기준: KODEX 200 (069500)</span>
-            <strong>{marketChange === undefined ? "—" : signed(marketChange) + "%"}</strong>
-          </div>
-        </section>
-
         <nav className="view-nav" aria-label="화면 메뉴">
           {[["dashboard","대시보드"],["stocks","종목 상세"],["history","시장·기록"],["validation","검증·상태"]].map(([key,label]) => <button key={key} className={activeView === key ? "active" : ""} onClick={() => setActiveView(key)}>{label}</button>)}
         </nav>
@@ -813,8 +801,8 @@ function App() {
           </section>
           <MarketTicker items={marketLive || []} updatedAt={marketLiveAt} />
           <section className="market-banner compact-banner">
-            <div><span className="eyebrow">MARKET MODE</span><strong>{marketChange == null ? "시장 데이터 확인 중" : marketChange <= -1 ? "시장 전체 위험회피 신호" : "현재 시장 모드"}</strong></div>
-            <span>KODEX 200 {marketChange == null ? "—" : signed(marketChange) + "%"} · {upCount}↑ {downCount}↓</span>
+            <div><span className="eyebrow">현재 시장 스냅샷</span><strong>{marketChange == null ? "시장 데이터 확인 중" : marketChange <= -1 ? "위험회피" : marketChange >= 1 ? "위험선호" : "중립"}</strong></div>
+            <span>KODEX 200 {marketChange == null ? "—" : signed(marketChange) + "%"} · 상승 {upCount} · 하락 {downCount}</span>
           </section>
           <section className="dashboard-main">
             <WatchlistPanel rows={validRows} selectedSymbol={selectedSymbol === "전체" ? (validRows[0]?.symbol || "") : selectedSymbol} onSelect={setSelectedSymbol} />
@@ -838,13 +826,13 @@ function App() {
             <div className="panel"><div className="section-heading compact"><div><span className="eyebrow">RECENT DECISIONS</span><h2>최근 판단 기록</h2></div></div>
               {decisions.length === 0 ? <p className="muted">저장된 판단 기록이 없거나 API에서 조회되지 않았습니다.</p> : <div className="decision-scroll"><div className="decision-list">{decisions.slice(0,10).map((item,index) => <div className="decision-row" key={item.id || item.ts || index}><div><strong>{item.name || item.symbol || "종목"}</strong><span>{item.symbol || "—"}</span></div><div><strong>{item.score ?? item.total ?? "—"}</strong><span>{item.opinion || "—"}</span></div><time>{item.created_at ? new Date(item.created_at).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}) : item.ts || item.timestamp || "—"}</time></div>)}</div></div>}
             </div>
-            <div className="panel"><div className="section-heading compact"><div><span className="eyebrow">REFRESH</span><h2>조회 설정</h2></div></div><label className="switch"><input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} /><span /> 10분 자동 새로고침</label><p className="small-note">실시간 매매용이 아닌 분석 앱이므로 자동 갱신은 10분 간격입니다. 수동 새로고침은 언제든 가능합니다.</p></div>
+            <div className="panel"><div className="section-heading compact"><div><span className="eyebrow">REFRESH</span><h2>조회 설정</h2></div></div><label className="switch"><input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} /><span /> 10분 자동 새로고침</label></div>
           </section>
         </>}
 
         {activeView === "validation" && <>
           <OutcomePanel outcomes={outcomes} />
-          <section className="section compact-section two-col"><div className="panel"><div className="section-heading compact"><div><span className="eyebrow">DATA STATUS</span><h2>데이터 상태</h2></div></div><div className="status-list"><div><span>API</span><strong className="status-ok">FastAPI 연결</strong></div><div><span>시장 데이터</span><strong>{market ? "수신 완료" : "조회 중"}</strong></div><div><span>KIS / Score</span><strong>{validRows.length ? "실데이터 수신" : "대기"}</strong></div><div><span>마지막 조회</span><strong>{lastUpdated ? lastUpdated.toLocaleTimeString("ko-KR") : snapshotAt ? new Date(snapshotAt).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "—"}</strong></div><div><span>자동 기록</span><strong>09:30 / 17:00 KST</strong></div></div><p className="small-note">자동 수집은 앱 실행과 별도로 역사적 Snapshot을 축적합니다. 현재 화면의 조회는 기록을 만들지 않습니다.</p></div></section>
+          <section className="section compact-section two-col"><div className="panel"><div className="section-heading compact"><div><span className="eyebrow">DATA STATUS</span><h2>데이터 상태</h2></div></div><div className="status-list"><div><span>API</span><strong className="status-ok">FastAPI 연결</strong></div><div><span>시장 데이터</span><strong>{market ? "수신 완료" : "조회 중"}</strong></div><div><span>KIS / Score</span><strong>{validRows.length ? "실데이터 수신" : "대기"}</strong></div><div><span>마지막 조회</span><strong>{lastUpdated ? lastUpdated.toLocaleTimeString("ko-KR") : snapshotAt ? new Date(snapshotAt).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "—"}</strong></div><div><span>자동 기록</span><strong>09:30 / 17:00 KST</strong></div></div></div></section>
         </>}
 
         <footer>
