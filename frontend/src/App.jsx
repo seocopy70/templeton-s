@@ -270,7 +270,7 @@ function Disclosures({ items }) {
       {items.length === 0 ? (
         <div className="panel"><p className="muted">공시가 없거나 DART API를 사용할 수 없습니다.</p></div>
       ) : (
-        <div className="table-wrap">
+        <div className="table-wrap disclosure-scroll">
           <table className="data-table">
             <thead><tr><th>일자</th><th>종목</th><th>제목</th><th>분류</th><th>중요도</th><th>가치영향</th></tr></thead>
             <tbody>
@@ -718,7 +718,8 @@ function App() {
             {decisions.length === 0 ? (
               <p className="muted">저장된 판단 기록이 없거나 API에서 조회되지 않았습니다.</p>
             ) : (
-              <div className="decision-list">
+              <div className="decision-scroll">
+                <div className="decision-list">
                 {decisions.slice(0, 10).map((item, index) => (
                   <div className="decision-row" key={item.id || item.ts || index}>
                     <div>
