@@ -26,6 +26,7 @@ import psycopg2
 from psycopg2.extras import Json
 
 from config import SYMBOLS, DART_API_KEY, KIS_ENV, validate_config
+from fred_client import fetch_fred_context
 from kis_client import KISClient
 from market_data import compute_volatility, compute_momentum
 from score_engine import calculate_templeton_score, MARKET_BENCHMARK_SYMBOL
@@ -183,10 +184,9 @@ def main() -> int:
             "market_regime": regime.regime,
             "benchmark_change_rate": benchmark_chg,
         }
-        macro_data = {
-            "captured_at_kst": now_kst.isoformat(),
-            "source": "oracle_snapshot_collector",
-        }
+        macro_data = fetch_fred_context()
+        macro_data["captured_at_kst"] = now_kst.isoformat()
+        macro_data["source"] = "fred"
 
         with conn.cursor() as cur:
             cur.execute(
@@ -201,7 +201,19 @@ def main() -> int:
                  Json(market_data), Json(macro_data)),
             )
         conn.commit()
-        print(f"[snapshot] stored market snapshot={snapshot_id}")
+        print(
+            f"[snapshot] stored market snapshot={snapshot_id} "
+            f"fred_status={macro_data.get('status')}"
+        )
+
+        macro_series = macro_data.get("series") or {}
+        macro_ctx = ", ".join(
+            f"{sid}={item.get('value')}"
+            for sid, item in macro_series.items()
+            if item.get("value") is not None
+        )
+        if not macro_ctx:
+            macro_ctx = "FRED macro data unavailable"
 
         coach = get_coach()
         for r in results:
@@ -213,7 +225,8 @@ def main() -> int:
                     r["name"], r["code"], score, score.get("opinion") or "",
                     market_ctx=(
                         f"시장모드: {regime.regime}, "
-                        f"벤치마크 변동률: {benchmark_chg}%"
+                        f"벤치마크 변동률: {benchmark_chg}%, "
+                        f"FRED: {macro_ctx}"
                     ),
                     events=r["events"],
                 )
@@ -243,6 +256,7 @@ def main() -> int:
                 "panic": panic,
                 "opportunity_rank": rank.get("opportunity_rank"),
                 "opportunity_score": rank.get("opportunity_score"),
+                "macro_data": macro_data,
             }
             with conn.cursor() as cur:
                 cur.execute(
