@@ -227,6 +227,68 @@ def panic_watch(
         raise HTTPException(status_code=502, detail=f"panic watch unavailable: {exc}") from exc
 
 
+@app.get("/snapshot-outcomes")
+def snapshot_outcomes(
+    limit: int = Query(100, ge=1, le=500),
+    symbol: Optional[str] = Query(None),
+) -> dict[str, Any]:
+    """Return persisted post-hoc outcomes without changing original judgments."""
+    url = os.getenv("NEON_DATABASE_URL")
+    if not url:
+        raise HTTPException(status_code=503, detail="snapshot database unavailable")
+    try:
+        with psycopg2.connect(url) as conn:
+            with conn.cursor() as cur:
+                if symbol:
+                    cur.execute(
+                        """
+                        select snapshot_id, symbol, horizon_days,
+                               reference_price, future_price,
+                               return_pct, benchmark_return_pct,
+                               evaluated_at, result
+                        from snapshot_outcomes
+                        where symbol=%s
+                        order by evaluated_at desc
+                        limit %s
+                        """,
+                        (symbol, limit),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        select snapshot_id, symbol, horizon_days,
+                               reference_price, future_price,
+                               return_pct, benchmark_return_pct,
+                               evaluated_at, result
+                        from snapshot_outcomes
+                        order by evaluated_at desc
+                        limit %s
+                        """,
+                        (limit,),
+                    )
+                rows = cur.fetchall()
+
+        return {
+            "ok": True,
+            "items": [
+                {
+                    "snapshot_id": str(row[0]),
+                    "symbol": row[1],
+                    "horizon_days": row[2],
+                    "reference_price": float(row[3]) if row[3] is not None else None,
+                    "future_price": float(row[4]) if row[4] is not None else None,
+                    "return_pct": float(row[5]) if row[5] is not None else None,
+                    "benchmark_return_pct": float(row[6]) if row[6] is not None else None,
+                    "evaluated_at": row[7].isoformat() if row[7] else None,
+                    "result": row[8] or {},
+                }
+                for row in rows
+            ],
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"snapshot outcomes unavailable: {exc}") from exc
+
+
 @app.get("/decisions")
 def decisions(
     limit: int = Query(50, ge=1, le=200),
