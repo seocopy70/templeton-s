@@ -3,12 +3,12 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 const API_BASE = (import.meta.env.VITE_API_URL || "/templeton-api").replace(/\/$/, "");
 const SCORE_KEYS = ["value", "price", "pessimism", "quality", "growth", "risk"];
 const SCORE_LABELS = {
-  value: "Value",
-  price: "Price",
-  pessimism: "Pessimism",
-  quality: "Quality",
-  growth: "Growth",
-  risk: "Risk",
+  value: "가치",
+  price: "가격",
+  pessimism: "비관",
+  quality: "품질",
+  growth: "성장",
+  risk: "위험",
 };
 const WATCH_ORDER = ["005930", "005380", "105560", "069500", "472150", "360750"];
 
@@ -100,7 +100,7 @@ function ScoreBars({ components }) {
         const value = Number(components[key]);
         return (
           <div className={`score-chip ${scoreTone(value)}`} key={key} title={`${SCORE_LABELS[key]} ${number(value)}`}>
-            <span>{SCORE_LABELS[key].slice(0, 1)}</span>
+            <span>{SCORE_LABELS[key]}</span>
             <strong>{number(value, 0)}</strong>
           </div>
         );
