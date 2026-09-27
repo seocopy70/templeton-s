@@ -455,9 +455,125 @@ function StockCard({ row, history, onLoadHistory, showScores }) {
   );
 }
 
+
+function MarketTicker({ items = [], updatedAt }) {
+  const ordered = items.filter((x) => x.ok);
+  return (
+    <section className="live-market">
+      <div className="live-market-head">
+        <div><span className="eyebrow">LIVE MARKET</span><strong>시장지표</strong></div>
+        <span className="live-clock">{updatedAt ? `1분 갱신 · ${updatedAt.toLocaleTimeString("ko-KR", {hour:"2-digit", minute:"2-digit", second:"2-digit"})}` : "시장지표 조회 중"}</span>
+      </div>
+      <div className="live-market-grid">
+        {ordered.length ? ordered.map((item) => {
+          const positive = Number(item.change_rate) >= 0;
+          return (
+            <div className="live-market-card" key={item.key}>
+              <div className="live-market-name">{item.name}</div>
+              <strong>{number(item.price, item.key === "KODEX200" ? 0 : 2)}</strong>
+              <span className={positive ? "up" : "down"}>{signed(item.change_rate)}%</span>
+            </div>
+          );
+        }) : <div className="live-empty">시장지표를 불러오는 중입니다…</div>}
+      </div>
+    </section>
+  );
+}
+
+function AIJudgment({ judgment }) {
+  if (!judgment) {
+    return <div className="ai-box empty">저장된 AI 판단이 아직 없습니다.</div>;
+  }
+  const list = (value) => Array.isArray(value) ? value : value ? [value] : [];
+  const positives = list(judgment.positives);
+  const negatives = list(judgment.negatives);
+  const conditions = list(judgment.change_conditions);
+  return (
+    <div className="ai-box">
+      <div className="ai-head">
+        <span>🤖 AI 판단</span>
+        <span className={`pill ${opinionTone(judgment.opinion)}`}>{judgment.opinion || "—"}</span>
+      </div>
+      {judgment.comment && <p className="ai-comment">{judgment.comment}</p>}
+      <div className="ai-columns">
+        <div><b className="ai-positive">긍정</b>{positives.length ? <ul>{positives.slice(0,3).map((x,i)=><li key={i}>{x}</li>)}</ul> : <p>—</p>}</div>
+        <div><b className="ai-negative">주의</b>{negatives.length ? <ul>{negatives.slice(0,3).map((x,i)=><li key={i}>{x}</li>)}</ul> : <p>—</p>}</div>
+      </div>
+      {judgment.counter_argument && <div className="ai-sub"><b>반대 논거</b><span>{judgment.counter_argument}</span></div>}
+      {conditions.length > 0 && <div className="ai-sub"><b>판단 변경 조건</b><span>{conditions.slice(0,2).join(" · ")}</span></div>}
+    </div>
+  );
+}
+
+function SelectedStockDetail({ row, history, judgment }) {
+  if (!row) return <div className="selected-detail panel">종목 데이터를 불러오는 중입니다.</div>;
+  const score = row.score || {};
+  const tone = opinionTone(score.opinion);
+  return (
+    <article className="selected-detail panel">
+      <div className="selected-head">
+        <div><span className="eyebrow">SELECTED STOCK</span><h2>{row.name}</h2><span className="muted">{row.symbol}</span></div>
+        <span className={`pill ${tone}`}>{score.opinion || "—"}</span>
+      </div>
+      <div className="selected-price-row">
+        <div><strong className="selected-price">{number(row.current_price, 0)}원</strong><span className={`change ${Number(row.change_rate) >= 0 ? "up" : "down"}`}>{signed(row.change_rate)}%</span></div>
+        <div className={`selected-score ${scoreTone(Number(score.total))}`}><span>Templeton Score</span><strong>{number(score.total)}</strong></div>
+      </div>
+      <ScoreBars components={score.components} />
+      <div className="selected-chart"><div className="section-label">최근 60일 가격 추이</div><MiniChart values={history?.closes || row.closes || []} /></div>
+      <div className="selected-facts">
+        <span>52주 고점 대비 <b>{pct(row.drop_from_52w_high)}</b></span>
+        <span>비관 신호 <b>{signalLabel(score.pessimism_inputs?.signal)}</b></span>
+      </div>
+      <AIJudgment judgment={judgment} />
+    </article>
+  );
+}
+
+function RiskSignals({ rows, panicWatch }) {
+  const signals = [];
+  const latestPanic = panicWatch.find((x) => x.panic_type && x.panic_type !== "none");
+  if (latestPanic) signals.push({ tone: "danger", title: latestPanic.panic_type, text: latestPanic.market_regime || "저장된 시장 위험 신호" });
+  rows.forEach((row) => {
+    const score = row.score || {};
+    const signal = score.pessimism_inputs?.signal;
+    if (signal && signal !== "none") signals.push({ tone: signal === "market_wide" ? "caution" : "danger", title: row.name, text: signalLabel(signal) });
+    if (score.opinion === "관망") signals.push({ tone: "caution", title: row.name, text: "AI 판단: 관망" });
+  });
+  const unique = signals.filter((x,i,a) => i === a.findIndex(y => y.title === x.title && y.text === x.text)).slice(0,6);
+  return (
+    <section className="risk-panel">
+      <div className="section-heading compact"><div><span className="eyebrow">RISK SIGNALS</span><h2>현재 위험 신호</h2></div><span className={unique.length ? "risk-count active" : "risk-count"}>{unique.length ? `${unique.length}건` : "정상"}</span></div>
+      {unique.length ? <div className="risk-grid">{unique.map((x,i)=><div className={`risk-chip ${x.tone}`} key={i}><b>{x.title}</b><span>{x.text}</span></div>)}</div> : <div className="risk-clear">🟢 현재 활성 위험신호 없음</div>}
+    </section>
+  );
+}
+
+function WatchlistPanel({ rows, selectedSymbol, onSelect }) {
+  return (
+    <section className="watch-panel panel">
+      <div className="section-heading compact"><div><span className="eyebrow">WATCHLIST</span><h2>관심종목</h2></div><span className="muted">클릭하면 상세 표시</span></div>
+      <div className="watch-list">
+        {rows.map((row) => {
+          const selected = row.symbol === selectedSymbol;
+          const score = row.score || {};
+          return <button className={`watch-item ${selected ? "selected" : ""}`} key={row.symbol} onClick={() => onSelect(row.symbol)}>
+            <span className="watch-name"><b>{row.name}</b><small>{row.symbol}</small></span>
+            <span className="watch-price">{number(row.current_price,0)}</span>
+            <span className={`watch-change ${Number(row.change_rate)>=0 ? "up":"down"}`}>{signed(row.change_rate)}%</span>
+            <span className={`watch-score ${scoreTone(Number(score.total))}`}>{number(score.total)}</span>
+          </button>;
+        })}
+      </div>
+    </section>
+  );
+}
+
 function App() {
   const [rows, setRows] = useState([]);
   const [market, setMarket] = useState(null);
+  const [marketLive, setMarketLive] = useState(null);
+  const [marketLiveAt, setMarketLiveAt] = useState(null);
   const [decisions, setDecisions] = useState([]);
   const [panicWatch, setPanicWatch] = useState([]);
   const [disclosures, setDisclosures] = useState([]);
@@ -514,10 +630,21 @@ function App() {
   const loadMarket = useCallback(async () => {
     try {
       const data = await getJson("/market-overview");
-      // /market-overview returns a bare item array; normalize it for the UI.
       setMarket(Array.isArray(data) ? { items: data } : data);
     } catch {
-      // Market overview is supplementary; the main score screen remains usable.
+      // Slower history/trend data is supplementary to the live ticker.
+    }
+  }, []);
+
+  const loadMarketLive = useCallback(async () => {
+    try {
+      const data = await getJson("/market-live");
+      if (Array.isArray(data.items)) {
+        setMarketLive(data.items);
+        setMarketLiveAt(new Date());
+      }
+    } catch {
+      // Keep the previous quote visible; the next one-minute poll retries.
     }
   }, []);
 
@@ -574,13 +701,20 @@ function App() {
   }, [history]);
 
   const refreshAll = useCallback(async (force = true) => {
-    await Promise.all([loadScores(force), loadMarket(), loadJudgments(), loadDisclosures(), loadOutcomes(), loadPanicWatch()]);
-  }, [loadScores, loadMarket, loadJudgments, loadDisclosures, loadOutcomes, loadPanicWatch]);
+    await Promise.all([loadScores(force), loadJudgments(), loadDisclosures(), loadOutcomes(), loadPanicWatch()]);
+  }, [loadScores, loadJudgments, loadDisclosures, loadOutcomes, loadPanicWatch]);
 
   useEffect(() => {
     loadLatestSnapshot();
+    loadMarketLive();
+    loadMarket();
     refreshAll(false);
-  }, [loadLatestSnapshot, refreshAll]);
+  }, [loadLatestSnapshot, loadMarketLive, loadMarket, refreshAll]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => loadMarketLive(), 60000);
+    return () => window.clearInterval(timer);
+  }, [loadMarketLive]);
 
   useEffect(() => {
     if (!autoRefresh) return undefined;
@@ -618,7 +752,7 @@ function App() {
           <span className={`connection ${error ? "offline" : "online"}`}>
             <i /> {error ? "연결 확인 필요" : refreshing ? "현재 데이터 갱신 중" : "실데이터 연결"}
           </span>
-          <button className="refresh-button" onClick={() => refreshAll(true)} disabled={refreshing}>
+          <button className="refresh-button" onClick={() => { refreshAll(true); loadMarketLive(); }} disabled={refreshing}>
             {refreshing ? "새로고침 중…" : "↻ 새로고침"}
           </button>
         </div>
@@ -655,17 +789,17 @@ function App() {
             <Metric label="상승" value={`${upCount}개`} />
             <Metric label="하락" value={`${downCount}개`} />
           </section>
+          <MarketTicker items={marketLive || []} updatedAt={marketLiveAt} />
           <section className="market-banner compact-banner">
             <div><span className="eyebrow">MARKET MODE</span><strong>{marketChange == null ? "시장 데이터 확인 중" : marketChange <= -1 ? "시장 전체 위험회피 신호" : "현재 시장 모드"}</strong></div>
             <span>KODEX 200 {marketChange == null ? "—" : signed(marketChange) + "%"} · {upCount}↑ {downCount}↓</span>
           </section>
-          <MarketOverview market={market} />
-          <section className="section compact-section">
-            <div className="section-heading"><div><span className="eyebrow">WATCHLIST TABLE</span><h2>관심 종목 한눈에 보기</h2></div><span className="muted">현재 조회값</span></div>
-            {loading ? <div className="panel"><p className="muted">조회 중…</p></div> : <WatchlistTable rows={validRows} />}
+          <section className="dashboard-main">
+            <WatchlistPanel rows={validRows} selectedSymbol={selectedSymbol === "전체" ? (validRows[0]?.symbol || "") : selectedSymbol} onSelect={setSelectedSymbol} />
+            <SelectedStockDetail row={validRows.find((r) => r.symbol === (selectedSymbol === "전체" ? validRows[0]?.symbol : selectedSymbol)) || validRows[0]} history={history[validRows.find((r) => r.symbol === (selectedSymbol === "전체" ? validRows[0]?.symbol : selectedSymbol))?.symbol]} judgment={decisions.find((d) => d.symbol === (selectedSymbol === "전체" ? validRows[0]?.symbol : selectedSymbol))} />
           </section>
+          <RiskSignals rows={validRows} panicWatch={panicWatch} />
         </>}
-
         {activeView === "stocks" && <section className="section compact-section">
           <div className="section-heading"><div><span className="eyebrow">WATCHLIST</span><h2>종목별 상세</h2></div>
             <div className="controls"><select value={selectedSymbol} onChange={(e) => setSelectedSymbol(e.target.value)}><option value="전체">전체 종목</option>{rows.map((row) => <option value={row.symbol} key={row.symbol}>{row.name}</option>)}</select>
