@@ -733,6 +733,7 @@ function App() {
                     <time>{item.created_at ? new Date(item.created_at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : item.ts || item.timestamp || "—"}</time>
                   </div>
                 ))}
+                </div>
               </div>
             )}
           </div>
