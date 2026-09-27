@@ -257,6 +257,7 @@ function WatchlistTable({ rows }) {
 }
 
 function Disclosures({ items }) {
+  const visible = items.slice(0, 8);
   return (
     <section className="section">
       <div className="section-heading">
@@ -264,7 +265,7 @@ function Disclosures({ items }) {
           <span className="eyebrow">DART DISCLOSURES</span>
           <h2>최근 공시</h2>
         </div>
-        <span className="muted">{items.length ? `${items.length}건` : "최근 공시 없음"}</span>
+        <span className="muted">{items.length ? `최근 ${Math.min(items.length, 8)}건` : "최근 공시 없음"}</span>
       </div>
       {items.length === 0 ? (
         <div className="panel"><p className="muted">공시가 없거나 DART API를 사용할 수 없습니다.</p></div>
@@ -273,7 +274,7 @@ function Disclosures({ items }) {
           <table className="data-table">
             <thead><tr><th>일자</th><th>종목</th><th>제목</th><th>분류</th><th>중요도</th><th>가치영향</th></tr></thead>
             <tbody>
-              {items.map((item, i) => (
+              {visible.map((item, i) => (
                 <tr key={item.event_id || i}>
                   <td>{item.ts || "—"}</td>
                   <td><strong>{item.name || item.symbol}</strong></td>
@@ -402,7 +403,7 @@ function PanicWatch({ items }) {
   );
 }
 
-function StockCard({ row, history, onLoadHistory }) {
+function StockCard({ row, history, onLoadHistory, showScores }) {
   const score = row.score;
   const price = row;
   const total = score?.total;
@@ -437,7 +438,7 @@ function StockCard({ row, history, onLoadHistory }) {
         <span>비관: {signalLabel(score?.pessimism_inputs?.signal)}</span>
       </div>
 
-      <ScoreBars components={score?.components} />
+      {showScores && <ScoreBars components={score?.components} />}
 
       <div className="chart-wrap">
         <div className="section-label">최근 가격</div>
@@ -472,7 +473,7 @@ function App() {
   const [error, setError] = useState("");
   const [lastUpdated, setLastUpdated] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
-  const [showScores, setShowScores] = useState(true);
+  const [showScores, setShowScores] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState("전체");
 
   const loadScores = useCallback(async (force = false) => {
@@ -498,7 +499,8 @@ function App() {
   const loadMarket = useCallback(async () => {
     try {
       const data = await getJson("/market-overview");
-      setMarket(data);
+      // /market-overview returns a bare item array; normalize it for the UI.
+      setMarket(Array.isArray(data) ? { items: data } : data);
     } catch {
       // Market overview is supplementary; the main score screen remains usable.
     }
@@ -506,7 +508,7 @@ function App() {
 
   const loadDisclosures = useCallback(async () => {
     try {
-      const data = await getJson("/disclosures?limit=30");
+      const data = await getJson("/disclosures?limit=8");
       setDisclosures(data.items || []);
     } catch {
       setDisclosures([]);
@@ -692,6 +694,7 @@ function App() {
                   row={row}
                   history={history[row.symbol]}
                   onLoadHistory={loadHistory}
+                  showScores={showScores}
                 />
               ))}
             </div>
