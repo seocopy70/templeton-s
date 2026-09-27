@@ -472,9 +472,28 @@ function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [snapshotAt, setSnapshotAt] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [showScores, setShowScores] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState("전체");
+
+  const loadLatestSnapshot = useCallback(async () => {
+    try {
+      const data = await getJson("/latest-snapshot");
+      if (Array.isArray(data.items) && data.items.length > 0) {
+        const ordered = [...data.items].sort((a, b) => {
+          const ai = WATCH_ORDER.indexOf(a.symbol);
+          const bi = WATCH_ORDER.indexOf(b.symbol);
+          return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi);
+        });
+        setRows(ordered);
+        setSnapshotAt(data.captured_at || null);
+        setLoading(false);
+      }
+    } catch {
+      // The live /scores request remains the authoritative fallback.
+    }
+  }, []);
 
   const loadScores = useCallback(async (force = false) => {
     setRefreshing(true);
@@ -563,12 +582,13 @@ function App() {
   }, [loadScores, loadMarket, loadJudgments, loadDisclosures, loadOutcomes, loadPanicWatch]);
 
   useEffect(() => {
+    loadLatestSnapshot();
     refreshAll(false);
-  }, [refreshAll]);
+  }, [loadLatestSnapshot, refreshAll]);
 
   useEffect(() => {
     if (!autoRefresh) return undefined;
-    const timer = window.setInterval(() => refreshAll(false), 30000);
+    const timer = window.setInterval(() => refreshAll(false), 600000);
     return () => window.clearInterval(timer);
   }, [autoRefresh, refreshAll]);
 
@@ -600,7 +620,7 @@ function App() {
         </div>
         <div className="top-actions">
           <span className={`connection ${error ? "offline" : "online"}`}>
-            <i /> {error ? "연결 확인 필요" : "실데이터 연결"}
+            <i /> {error ? "연결 확인 필요" : refreshing ? "현재 데이터 갱신 중" : "실데이터 연결"}
           </span>
           <button className="refresh-button" onClick={() => refreshAll(true)} disabled={refreshing}>
             {refreshing ? "새로고침 중…" : "↻ 새로고침"}
@@ -620,7 +640,7 @@ function App() {
           <div>
             <span className="eyebrow">현재 시장 스냅샷</span>
             <h2>오늘의 Templeton S</h2>
-            <p>앱을 열면 현재 데이터를 조회합니다. 조회 자체가 역사적 기록을 생성하지는 않습니다.</p>
+            <p>{snapshotAt && refreshing ? "최근 저장 Snapshot을 먼저 표시하고 현재 데이터를 갱신합니다. 조회 자체가 역사적 기록을 생성하지는 않습니다." : "앱을 열면 현재 데이터를 조회합니다. 조회 자체가 역사적 기록을 생성하지는 않습니다."}</p>
           </div>
           <div className="hero-meta">
             <span>기준: KODEX 200 (069500)</span>
@@ -679,7 +699,7 @@ function App() {
               </label>
               <label className="switch">
                 <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} />
-                <span /> 30초 자동 새로고침
+                <span /> 10분 자동 새로고침
               </label>
             </div>
           </div>
@@ -749,7 +769,7 @@ function App() {
               <div><span>API</span><strong className="status-ok">FastAPI 연결</strong></div>
               <div><span>시장 데이터</span><strong>{market ? "수신 완료" : "조회 중"}</strong></div>
               <div><span>KIS / Score</span><strong>{validRows.length ? "실데이터 수신" : "대기"}</strong></div>
-              <div><span>마지막 조회</span><strong>{lastUpdated ? lastUpdated.toLocaleTimeString("ko-KR") : "—"}</strong></div>
+              <div><span>마지막 조회</span><strong>{lastUpdated ? lastUpdated.toLocaleTimeString("ko-KR") : snapshotAt ? new Date(snapshotAt).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</strong></div>
               <div><span>자동 기록</span><strong>09:30 / 17:00 KST</strong></div>
             </div>
             <p className="small-note">
