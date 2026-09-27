@@ -98,8 +98,8 @@ def main() -> int:
                     (captured_at, run_id),
                 )
             else:
-                run_id = uuid.uuid4()
-                snapshot_id = uuid.uuid4()
+                run_id = str(uuid.uuid4())
+                snapshot_id = str(uuid.uuid4())
                 cur.execute(
                     """insert into collection_runs(
                          run_id,slot,captured_at,status,snapshot_id
