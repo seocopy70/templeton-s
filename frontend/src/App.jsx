@@ -198,31 +198,35 @@ function MarketTrend({ item }) {
 function MarketOverview({ market }) {
   const items = (market?.items || []).filter((item) => item.ok);
   return (
-    <section className="section">
+    <section className="section compact-section">
       <div className="section-heading">
-        <div>
-          <span className="eyebrow">MARKET OVERVIEW</span>
-          <h2>시장 기본 정보 · 최근 추이</h2>
-        </div>
-        <span className="muted">{items.length ? `${items.length}개 지표 · 최근 약 1개월` : "시장 지표 조회 중"}</span>
+        <div><span className="eyebrow">MARKET OVERVIEW</span><h2>시장 기본 정보 · 추이</h2></div>
+        <span className="muted">{items.length ? `${items.length}개 지표` : "시장 지표 조회 중"}</span>
       </div>
       {items.length === 0 ? (
         <div className="panel"><p className="muted">시장 지표를 불러오지 못했습니다.</p></div>
       ) : (
-        <>
-          <div className="market-index-grid">
-            {items.map((item) => (
-              <div className="market-index-card" key={item.key}>
-                <span>{item.name}</span>
-                <strong>{number(item.price, 2)}</strong>
-                <b className={Number(item.change_rate) >= 0 ? "up" : "down"}>{signed(item.change_rate)}%</b>
+        <div className="market-compact-grid">
+          {items.map((item) => {
+            const values = (item.closes || []).map(Number).filter(Number.isFinite);
+            const width = 180, height = 42, pad = 3;
+            const min = values.length ? Math.min(...values) : 0;
+            const max = values.length ? Math.max(...values) : 1;
+            const range = max - min || 1;
+            const points = values.length > 1 ? values.map((v, i) => {
+              const x = pad + (i / (values.length - 1)) * (width - pad * 2);
+              const y = height - pad - ((v - min) / range) * (height - pad * 2);
+              return `${x.toFixed(1)},${y.toFixed(1)}`;
+            }).join(" ") : "";
+            return (
+              <div className="market-compact-card" key={item.key}>
+                <div className="market-compact-head"><strong>{item.name}</strong><b className={Number(item.change_rate) >= 0 ? "up" : "down"}>{signed(item.change_rate)}%</b></div>
+                <div className="market-compact-value">{number(item.price, 2)}</div>
+                {points ? <svg className="market-compact-chart" viewBox={`0 0 ${width} ${height}`} aria-label={`${item.name} 최근 추이`}><polyline points={points} fill="none" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" /></svg> : <div className="market-compact-chart-empty">—</div>}
               </div>
-            ))}
-          </div>
-          <div className="market-trend-grid">
-            {items.map((item) => <MarketTrend item={item} key={`${item.key}-trend`} />)}
-          </div>
-        </>
+            );
+          })}
+        </div>
       )}
     </section>
   );
@@ -474,8 +478,9 @@ function App() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [snapshotAt, setSnapshotAt] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
-  const [showScores, setShowScores] = useState(false);
+  const [showScores, setShowScores] = useState(true);
   const [selectedSymbol, setSelectedSymbol] = useState("전체");
+  const [activeView, setActiveView] = useState("dashboard");
 
   const loadLatestSnapshot = useCallback(async () => {
     try {
@@ -648,136 +653,52 @@ function App() {
           </div>
         </section>
 
-        <section className="metrics-grid">
-          <Metric label="조회 종목" value={`${validRows.length} / ${rows.length || 6}`} sub="실데이터 응답 기준" />
-          <Metric label="평균 Score" value={avgScore == null ? "—" : number(avgScore)} sub="현재 조회값" />
-          <Metric label="상승 종목" value={`${upCount}개`} sub="당일 등락률 기준" />
-          <Metric label="하락 종목" value={`${downCount}개`} sub="당일 등락률 기준" />
-        </section>
+        <nav className="view-nav" aria-label="화면 메뉴">
+          {[["dashboard","대시보드"],["stocks","종목 상세"],["history","시장·기록"],["validation","검증·상태"]].map(([key,label]) => <button key={key} className={activeView === key ? "active" : ""} onClick={() => setActiveView(key)}>{label}</button>)}
+        </nav>
 
-        <section className="market-banner">
-          <div>
-            <span className="eyebrow">시장 컨텍스트</span>
-            <h3>{marketChange == null ? "시장 데이터 확인 중" : marketChange <= -1 ? "시장 전체 위험회피 신호" : "현재 시장 모드"}</h3>
-            <p>
-              KODEX 200 {marketChange == null ? "—" : signed(marketChange) + "%"} ·
-              {" "}{upCount}개 상승 / {downCount}개 하락
-            </p>
-          </div>
-          <div className="market-note">
-            {market?.items?.length ? `${market.items.length}개 시장 지표 연결됨` : "시장 세부지표는 API 응답을 확인합니다."}
-          </div>
-        </section>
+        {activeView === "dashboard" && <>
+          <section className="metrics-grid compact-metrics">
+            <Metric label="조회 종목" value={`${validRows.length} / ${rows.length || 6}`} />
+            <Metric label="평균 Score" value={avgScore == null ? "—" : number(avgScore)} />
+            <Metric label="상승" value={`${upCount}개`} />
+            <Metric label="하락" value={`${downCount}개`} />
+          </section>
+          <section className="market-banner compact-banner">
+            <div><span className="eyebrow">MARKET MODE</span><strong>{marketChange == null ? "시장 데이터 확인 중" : marketChange <= -1 ? "시장 전체 위험회피 신호" : "현재 시장 모드"}</strong></div>
+            <span>KODEX 200 {marketChange == null ? "—" : signed(marketChange) + "%"} · {upCount}↑ {downCount}↓</span>
+          </section>
+          <MarketOverview market={market} />
+          <section className="section compact-section">
+            <div className="section-heading"><div><span className="eyebrow">WATCHLIST TABLE</span><h2>관심 종목 한눈에 보기</h2></div><span className="muted">현재 조회값</span></div>
+            {loading ? <div className="panel"><p className="muted">조회 중…</p></div> : <WatchlistTable rows={validRows} />}
+          </section>
+        </>}
 
-        <MarketOverview market={market} />
-
-        <section className="section">
-          <div className="section-heading">
-            <div>
-              <span className="eyebrow">WATCHLIST TABLE</span>
-              <h2>관심 종목 한눈에 보기</h2>
-            </div>
-            <span className="muted">현재 조회값</span>
-          </div>
-          {loading ? <div className="panel"><p className="muted">조회 중…</p></div> : <WatchlistTable rows={validRows} />}
-        </section>
-
-        <section className="section">
-          <div className="section-heading">
-            <div>
-              <span className="eyebrow">WATCHLIST</span>
-              <h2>관심 종목 현황</h2>
-            </div>
-            <div className="controls">
-              <select value={selectedSymbol} onChange={(e) => setSelectedSymbol(e.target.value)}>
-                <option value="전체">전체 종목</option>
-                {rows.map((row) => <option value={row.symbol} key={row.symbol}>{row.name}</option>)}
-              </select>
-              <label className="switch">
-                <input type="checkbox" checked={showScores} onChange={(e) => setShowScores(e.target.checked)} />
-                <span /> Score 상세
-              </label>
-              <label className="switch">
-                <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} />
-                <span /> 10분 자동 새로고침
-              </label>
+        {activeView === "stocks" && <section className="section compact-section">
+          <div className="section-heading"><div><span className="eyebrow">WATCHLIST</span><h2>종목별 상세</h2></div>
+            <div className="controls"><select value={selectedSymbol} onChange={(e) => setSelectedSymbol(e.target.value)}><option value="전체">전체 종목</option>{rows.map((row) => <option value={row.symbol} key={row.symbol}>{row.name}</option>)}</select>
+              <label className="switch"><input type="checkbox" checked={showScores} onChange={(e) => setShowScores(e.target.checked)} /><span /> Score 그래프</label>
             </div>
           </div>
+          {loading ? <div className="loading-grid">{[1,2,3,4,5,6].map((x) => <div className="skeleton" key={x} />)}</div> : <div className="stock-grid compact-stock-grid">{visibleRows.map((row) => <StockCard key={row.symbol} row={row} history={history[row.symbol]} onLoadHistory={loadHistory} showScores={showScores} />)}</div>}
+        </section>}
 
-          {loading ? (
-            <div className="loading-grid">{[1,2,3,4,5,6].map((x) => <div className="skeleton" key={x} />)}</div>
-          ) : (
-            <div className="stock-grid">
-              {visibleRows.map((row) => (
-                <StockCard
-                  key={row.symbol}
-                  row={row}
-                  history={history[row.symbol]}
-                  onLoadHistory={loadHistory}
-                  showScores={showScores}
-                />
-              ))}
+        {activeView === "history" && <>
+          <Disclosures items={disclosures} />
+          <PanicWatch items={panicWatch} />
+          <section className="section two-col compact-section">
+            <div className="panel"><div className="section-heading compact"><div><span className="eyebrow">RECENT DECISIONS</span><h2>최근 판단 기록</h2></div></div>
+              {decisions.length === 0 ? <p className="muted">저장된 판단 기록이 없거나 API에서 조회되지 않았습니다.</p> : <div className="decision-scroll"><div className="decision-list">{decisions.slice(0,10).map((item,index) => <div className="decision-row" key={item.id || item.ts || index}><div><strong>{item.name || item.symbol || "종목"}</strong><span>{item.symbol || "—"}</span></div><div><strong>{item.score ?? item.total ?? "—"}</strong><span>{item.opinion || "—"}</span></div><time>{item.created_at ? new Date(item.created_at).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}) : item.ts || item.timestamp || "—"}</time></div>)}</div></div>}
             </div>
-          )}
-        </section>
+            <div className="panel"><div className="section-heading compact"><div><span className="eyebrow">REFRESH</span><h2>조회 설정</h2></div></div><label className="switch"><input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} /><span /> 10분 자동 새로고침</label><p className="small-note">실시간 매매용이 아닌 분석 앱이므로 자동 갱신은 10분 간격입니다. 수동 새로고침은 언제든 가능합니다.</p></div>
+          </section>
+        </>}
 
-        <Disclosures items={disclosures} />
-
-        <PanicWatch items={panicWatch} />
-
-        <OutcomePanel outcomes={outcomes} />
-
-        <section className="section two-col">
-          <div className="panel">
-            <div className="section-heading compact">
-              <div>
-                <span className="eyebrow">RECENT DECISIONS</span>
-                <h2>최근 판단 기록</h2>
-              </div>
-            </div>
-            {decisions.length === 0 ? (
-              <p className="muted">저장된 판단 기록이 없거나 API에서 조회되지 않았습니다.</p>
-            ) : (
-              <div className="decision-scroll">
-                <div className="decision-list">
-                {decisions.slice(0, 10).map((item, index) => (
-                  <div className="decision-row" key={item.id || item.ts || index}>
-                    <div>
-                      <strong>{item.name || item.symbol || "종목"}</strong>
-                      <span>{item.symbol || "—"}</span>
-                    </div>
-                    <div>
-                      <strong>{item.score ?? item.total ?? "—"}</strong>
-                      <span>{item.opinion || "—"}</span>
-                    </div>
-                    <time>{item.created_at ? new Date(item.created_at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : item.ts || item.timestamp || "—"}</time>
-                  </div>
-                ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="panel">
-            <div className="section-heading compact">
-              <div>
-                <span className="eyebrow">DATA STATUS</span>
-                <h2>데이터 상태</h2>
-              </div>
-            </div>
-            <div className="status-list">
-              <div><span>API</span><strong className="status-ok">FastAPI 연결</strong></div>
-              <div><span>시장 데이터</span><strong>{market ? "수신 완료" : "조회 중"}</strong></div>
-              <div><span>KIS / Score</span><strong>{validRows.length ? "실데이터 수신" : "대기"}</strong></div>
-              <div><span>마지막 조회</span><strong>{lastUpdated ? lastUpdated.toLocaleTimeString("ko-KR") : snapshotAt ? new Date(snapshotAt).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</strong></div>
-              <div><span>자동 기록</span><strong>09:30 / 17:00 KST</strong></div>
-            </div>
-            <p className="small-note">
-              자동 수집은 앱 실행과 별도로 역사적 Snapshot을 축적하는 경로입니다.
-              현재 화면의 조회는 그 자체로 기록을 만들지 않습니다.
-            </p>
-          </div>
-        </section>
+        {activeView === "validation" && <>
+          <OutcomePanel outcomes={outcomes} />
+          <section className="section compact-section two-col"><div className="panel"><div className="section-heading compact"><div><span className="eyebrow">DATA STATUS</span><h2>데이터 상태</h2></div></div><div className="status-list"><div><span>API</span><strong className="status-ok">FastAPI 연결</strong></div><div><span>시장 데이터</span><strong>{market ? "수신 완료" : "조회 중"}</strong></div><div><span>KIS / Score</span><strong>{validRows.length ? "실데이터 수신" : "대기"}</strong></div><div><span>마지막 조회</span><strong>{lastUpdated ? lastUpdated.toLocaleTimeString("ko-KR") : snapshotAt ? new Date(snapshotAt).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "—"}</strong></div><div><span>자동 기록</span><strong>09:30 / 17:00 KST</strong></div></div><p className="small-note">자동 수집은 앱 실행과 별도로 역사적 Snapshot을 축적합니다. 현재 화면의 조회는 기록을 만들지 않습니다.</p></div></section>
+        </>}
 
         <footer>
           <span>Templeton S · Score v0.5</span>
