@@ -851,3 +851,72 @@ footer{margin-top:16px;padding-top:8px}
     font-size:8px;
   }
 }
+
+/* 2026-09-27 outside-text readability correction
+   Keep selected-stock detail restrained; enlarge surrounding dashboard text slightly
+   without changing the compact one-line layout. */
+.brand-line p{font-size:11px}
+.connection{font-size:14px}
+.refresh-button{font-size:13px}
+.hero p{font-size:12px}
+.hero-meta{font-size:13px}
+.metric span,.metric small{font-size:11px}
+.compact-metrics .metric strong{font-size:18px}
+.market-banner.compact-banner strong{font-size:15px}
+.market-banner.compact-banner > span{font-size:12px}
+.section-heading h2{font-size:16px}
+.eyebrow{font-size:10px}
+.watch-name b{font-size:12px}
+.watch-name small{font-size:9px}
+.watch-price{font-size:12px}
+.watch-change{font-size:11px}
+.watch-score{font-size:11px}
+.risk-chip b{font-size:11px}
+.risk-chip span{font-size:10px}
+.risk-clear{font-size:11px}
+.ai-head{font-size:12px}
+.ai-comment{font-size:11px}
+.ai-columns b{font-size:10px}
+.ai-columns li,.ai-columns p{font-size:10px}
+.ai-sub{font-size:10px}
+.selected-detail{padding:8px 10px}
+.selected-head h2{font-size:17px}
+.selected-price{font-size:24px}
+.selected-score strong{font-size:19px}
+.selected-detail .score-chip span{font-size:9px}
+.selected-detail .score-chip strong{font-size:10px}
+.selected-chart .section-label{font-size:9px}
+.selected-facts span{font-size:9px}
+
+@media(max-width:700px){
+  .brand-line p{font-size:9px}
+  .hero p{font-size:10px}
+  .hero-meta{font-size:10px}
+  .metric span,.metric small{font-size:8px}
+  .compact-metrics .metric strong{font-size:13px}
+  .market-banner.compact-banner strong{font-size:13px}
+  .market-banner.compact-banner > span{font-size:9px}
+  .section-heading h2{font-size:14px}
+  .eyebrow{font-size:9px}
+  .watch-name b{font-size:10px}
+  .watch-name small{font-size:8px}
+  .watch-price{font-size:10px}
+  .watch-change{font-size:9px}
+  .watch-score{font-size:9px}
+  .risk-chip b{font-size:9px}
+  .risk-chip span{font-size:8px}
+  .risk-clear{font-size:9px}
+  .ai-head{font-size:10px}
+  .ai-comment{font-size:9px}
+  .ai-columns b{font-size:9px}
+  .ai-columns li,.ai-columns p{font-size:9px}
+  .ai-sub{font-size:9px}
+  .selected-detail{padding:6px 7px}
+  .selected-head h2{font-size:15px}
+  .selected-price{font-size:20px}
+  .selected-score strong{font-size:16px}
+  .selected-detail .score-chip span{font-size:8px}
+  .selected-detail .score-chip strong{font-size:9px}
+  .selected-chart .section-label{font-size:8px}
+  .selected-facts span{font-size:8px}
+}
