@@ -190,3 +190,12 @@ Streamlit에서 확인된 기존 핵심 화면 중 React에 빠져 있던 영역
 - 넓은 화면은 기존 구조를 유지하면서 동일한 compact spacing 원칙을 적용
 - GitHub main 반영 완료: `384b46bc9c2c1f4b1b02ca91c45e551149361d61`
 - Oracle pull/build 및 모바일 브라우저 검증 대기
+
+## 2026-09-27 헤더/시장모드/모바일 오류 대응
+
+- 상단 앱 제목과 중복되던 큰 `오늘의 Templeton S` 제목을 제거하고 현재 Snapshot 상태만 간결하게 표시
+- MARKET MODE가 의미 없는 `현재 시장 모드`로만 표시되던 문제를 수정해 `위험회피 / 위험선호 / 중립`으로 명확히 표시
+- 모바일에서 시장 모드의 실제 내용이 작게 보이지 않도록 표시 크기 보정
+- React Error Boundary를 추가해 모바일에서 런타임 오류가 발생할 경우 흰 화면 대신 오류 내용을 표시하도록 보강
+- GitHub main 반영: `f84b0b9641d3c1e545b7ef7f31bcf89a955042da`
+- Oracle pull/build 후 모바일 브라우저에서 실제 오류 여부 확인 필요
