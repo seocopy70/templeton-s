@@ -569,6 +569,28 @@ function WatchlistPanel({ rows, selectedSymbol, onSelect }) {
   );
 }
 
+class AppErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{padding:"20px",fontFamily:"system-ui",color:"#172033"}}>
+          <h2 style={{margin:"0 0 8px"}}>Templeton S 화면 오류</h2>
+          <p style={{fontSize:"13px",color:"#64748b"}}>브라우저에서 화면을 그리는 중 오류가 발생했습니다.</p>
+          <pre style={{whiteSpace:"pre-wrap",fontSize:"11px",background:"#f8fafc",padding:"10px",borderRadius:"8px",overflow:"auto"}}>{String(this.state.error?.stack || this.state.error)}</pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function App() {
   const [rows, setRows] = useState([]);
   const [market, setMarket] = useState(null);
@@ -834,4 +856,4 @@ function App() {
   );
 }
 
-export default App;
+export default function AppWithErrorBoundary() {\n  return <AppErrorBoundary><App /></AppErrorBoundary>;\n}
