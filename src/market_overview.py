@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Optional
 
 import requests
@@ -199,23 +200,22 @@ def _etf_fallback(client: KISClient, code: str) -> Optional[dict[str, Any]]:
 
 
 def fetch_market_overview(client: Optional[KISClient] = None) -> list[dict[str, Any]]:
-    """
-    표시용 리스트:
-    [{key, name, region, price, change_rate, closes, source, ok}]
+    """Fetch the six market indicators concurrently.
+
+    The displayed data and fallback rules are unchanged; only the independent
+    network calls are parallelized so the dashboard does not wait on each
+    market sequentially.
     """
     if client is None:
         client = KISClient()
 
-    items: list[dict[str, Any]] = []
-
-    # 한국
-    for name, code in KIS_INDEX.items():
+    def fetch_korea(name: str, code: str) -> dict[str, Any]:
         q = _kis_index(client, code)
         closes = _kis_index_closes(client, code, 30) if q else []
         if q and (q.get("price") is not None or closes):
             if closes:
                 q["closes"] = closes
-            items.append({
+            return {
                 "key": name,
                 "name": name,
                 "region": "KR",
@@ -224,36 +224,24 @@ def fetch_market_overview(client: Optional[KISClient] = None) -> list[dict[str, 
                 "closes": q.get("closes") or [],
                 "source": q.get("source"),
                 "ok": True,
-            })
-        else:
-            # KODEX200 대리 for KOSPI only
-            if name == "KOSPI":
-                fb = _etf_fallback(client, "069500")
-                if fb:
-                    items.append({
-                        "key": name,
-                        "name": "KOSPI(대용 KODEX200)",
-                        "region": "KR",
-                        **{k: fb[k] for k in ("price", "change_rate", "closes", "source")},
-                        "ok": True,
-                    })
-                    continue
-            items.append({
-                "key": name,
-                "name": name,
-                "region": "KR",
-                "price": None,
-                "change_rate": None,
-                "closes": [],
-                "source": None,
-                "ok": False,
-            })
+            }
+        if name == "KOSPI":
+            fb = _etf_fallback(client, "069500")
+            if fb:
+                return {
+                    "key": name,
+                    "name": "KOSPI(대용 KODEX200)",
+                    "region": "KR",
+                    **{k: fb[k] for k in ("price", "change_rate", "closes", "source")},
+                    "ok": True,
+                }
+        return {"key": name, "name": name, "region": "KR", "price": None,
+                "change_rate": None, "closes": [], "source": None, "ok": False}
 
-    # 미국 · 일본 (Yahoo)
-    for name, ysym in YAHOO.items():
+    def fetch_global(name: str, ysym: str) -> dict[str, Any]:
         y = _yahoo_quote_and_closes(ysym, 30)
         if y and y.get("price") is not None:
-            items.append({
+            return {
                 "key": name,
                 "name": name,
                 "region": "US" if "Nikkei" not in name else "JP",
@@ -262,38 +250,38 @@ def fetch_market_overview(client: Optional[KISClient] = None) -> list[dict[str, 
                 "closes": y.get("closes") or [],
                 "source": y.get("source"),
                 "ok": True,
-            })
-        elif name == "S&P500":
+            }
+        if name == "S&P500":
             fb = _etf_fallback(client, ETF_PROXY["S&P500"])
             if fb:
-                items.append({
+                return {
                     "key": name,
                     "name": "S&P500(대용 ETF)",
                     "region": "US",
                     **{k: fb[k] for k in ("price", "change_rate", "closes", "source")},
                     "ok": True,
-                })
-            else:
-                items.append({
-                    "key": name,
-                    "name": name,
-                    "region": "US",
-                    "price": None,
-                    "change_rate": None,
-                    "closes": [],
-                    "source": None,
-                    "ok": False,
-                })
-        else:
-            items.append({
-                "key": name,
-                "name": name,
+                }
+        return {"key": name, "name": name,
                 "region": "JP" if "Nikkei" in name else "US",
-                "price": None,
-                "change_rate": None,
-                "closes": [],
-                "source": None,
-                "ok": False,
-            })
+                "price": None, "change_rate": None, "closes": [],
+                "source": None, "ok": False}
 
-    return items
+    results: dict[str, dict[str, Any]] = {}
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {}
+        for name, code in KIS_INDEX.items():
+            futures[executor.submit(fetch_korea, name, code)] = name
+        for name, ysym in YAHOO.items():
+            futures[executor.submit(fetch_global, name, ysym)] = name
+        for future in as_completed(futures):
+            name = futures[future]
+            try:
+                results[name] = future.result()
+            except Exception as exc:
+                logger.warning("market overview %s 실패: %s", name, exc)
+                region = "JP" if "Nikkei" in name else ("US" if name in YAHOO else "KR")
+                results[name] = {"key": name, "name": name, "region": region,
+                                 "price": None, "change_rate": None, "closes": [],
+                                 "source": None, "ok": False}
+
+    return [results[name] for name in (*KIS_INDEX.keys(), *YAHOO.keys())]
