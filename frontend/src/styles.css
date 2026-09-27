@@ -680,3 +680,77 @@ footer{margin-top:16px;padding-top:8px}
     grid-template-columns:repeat(3,minmax(0,1fr));
   }
 }
+
+
+/* 2026-09-27 final single-line headings and market snapshot */
+.market-banner.compact-banner{
+  display:flex;
+  flex-direction:row;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.market-banner.compact-banner > div{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  min-width:0;
+}
+.market-banner.compact-banner > div .eyebrow{
+  flex:0 0 auto;
+}
+.market-banner.compact-banner > div strong{
+  margin:0;
+  white-space:nowrap;
+}
+.market-banner.compact-banner > span{
+  white-space:nowrap;
+  flex:0 0 auto;
+}
+.section-heading.compact{
+  flex-direction:row;
+  align-items:center;
+}
+.section-heading.compact > div{
+  flex:0 1 auto;
+  white-space:nowrap;
+}
+.section-heading.compact > div h2{
+  white-space:nowrap;
+}
+.section-heading.compact > span{
+  flex:0 0 auto;
+  white-space:nowrap;
+}
+@media(max-width:700px){
+  .market-banner.compact-banner{
+    flex-direction:row;
+    align-items:center;
+  }
+  .market-banner.compact-banner > div{
+    min-width:0;
+    gap:5px;
+  }
+  .market-banner.compact-banner > div .eyebrow{
+    font-size:8px;
+  }
+  .market-banner.compact-banner > div strong{
+    font-size:11px;
+  }
+  .market-banner.compact-banner > span{
+    font-size:8px;
+  }
+  .section-heading.compact{
+    flex-direction:row;
+    align-items:center;
+  }
+  .section-heading.compact > div{
+    gap:5px;
+  }
+  .section-heading.compact > div .eyebrow{
+    font-size:8px;
+  }
+  .section-heading.compact > div h2{
+    font-size:12px;
+  }
+}
