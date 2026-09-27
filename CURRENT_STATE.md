@@ -87,6 +87,21 @@
 - 검증된 Snapshot: 8b28bbd5-86a0-4dd3-984a-522a869817d2
 - 검증된 run: 56c22437-24e0-4b97-a691-15af90bf8413
 
+## 2026-09-27 Streamlit 기능 보강 React UI 구현
+
+Streamlit에서 확인된 기존 핵심 화면 중 React에 빠져 있던 영역을 새 React 구조에 추가했다.
+
+- KOSPI / KOSDAQ / S&P500 / NASDAQ / Nikkei225 시장 기본 정보
+- 주요 시장 약 1개월 추이 그래프
+- 관심종목 6개 통합 현황 표
+- DART 최근 공시 영역 및 원문 링크
+- Neon에 저장된 실제 AI Snapshot 판단 기록 조회
+- Snapshot 1/5/20일 사후검증 결과 영역 및 KODEX 200 상대성과
+- 기존 Panic Watch와 종목별 상세 화면은 유지
+- 새 API: `/disclosures`, `/ai-judgments`
+
+현재 코드는 GitHub main 기준으로 구현 완료했으며 Oracle 반영은 build/브라우저 검증 후 확정한다.
+
 ## 현재 운영 상태
 
 - 개발/이식/배포 작업은 완료
@@ -98,10 +113,11 @@
 
 ## 다음 작업
 
-1. 자동수집 cron의 실제 실행 여부 확인
-2. 1/5/20일 horizon 도래 후 snapshot_outcomes 생성 확인
-3. 충분한 데이터 축적 후 AI 판단과 KODEX 200 대비 성과 분석
-4. 필요할 때만 AI 모델 비교 및 관련 UI 확장
+1. 새 React UI를 Oracle에서 pull/build 후 브라우저 검증
+2. 자동수집 cron의 실제 실행 여부 확인
+3. 1/5/20일 horizon 도래 후 snapshot_outcomes 생성 확인
+4. 충분한 데이터 축적 후 AI 판단과 KODEX 200 대비 성과 분석
+5. 필요할 때만 AI 모델 비교 및 관련 UI 확장
 
 ## 기록 원칙
 
