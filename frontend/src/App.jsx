@@ -95,18 +95,13 @@ function MiniChart({ values = [] }) {
 function ScoreBars({ components }) {
   if (!components) return null;
   return (
-    <div className="score-bars">
+    <div className="score-strip" aria-label="Templeton Score 구성요소">
       {SCORE_KEYS.map((key) => {
         const value = Number(components[key]);
         return (
-          <div className="score-row" key={key}>
-            <div className="score-row-label">
-              <span>{SCORE_LABELS[key]}</span>
-              <strong>{number(value)}</strong>
-            </div>
-            <div className="score-track">
-              <div className={`score-fill ${scoreTone(value)}`} style={{ width: `${Math.max(0, Math.min(100, value || 0))}%` }} />
-            </div>
+          <div className={`score-chip ${scoreTone(value)}`} key={key} title={`${SCORE_LABELS[key]} ${number(value)}`}>
+            <span>{SCORE_LABELS[key].slice(0, 1)}</span>
+            <strong>{number(value, 0)}</strong>
           </div>
         );
       })}
@@ -445,13 +440,9 @@ function StockCard({ row, history, onLoadHistory, showScores }) {
       {showScores && <ScoreBars components={score?.components} />}
 
       <div className="chart-wrap">
-        <div className="section-label">최근 가격</div>
-        <MiniChart values={history?.closes || []} />
-        {!history && (
-          <button className="text-button" onClick={() => onLoadHistory(row.symbol)}>
-            가격 이력 불러오기
-          </button>
-        )}
+        <div className="section-label">최근 60일 가격 추이</div>
+        <MiniChart values={history?.closes || row.closes || []} />
+
       </div>
 
       <details className="details">
