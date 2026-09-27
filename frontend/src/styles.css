@@ -498,3 +498,87 @@ footer{margin-top:16px;padding-top:8px}
     margin-top:5px;
   }
 }
+
+
+/* 2026-09-27 compact UI pass 2 */
+.view-nav{
+  margin:2px 0 5px;
+  padding:2px;
+  gap:4px;
+}
+.view-nav button{
+  padding:6px 12px;
+  font-size:12px;
+}
+.market-banner.compact-banner{
+  margin:4px 0 6px;
+  padding:6px 9px;
+}
+.metrics-grid.compact-metrics{
+  margin-bottom:5px;
+}
+.live-market{
+  margin-top:5px;
+}
+.ai-collapsed{
+  cursor:default;
+}
+.ai-collapsed summary{
+  list-style:none;
+  cursor:pointer;
+}
+.ai-collapsed summary::-webkit-details-marker{
+  display:none;
+}
+.ai-collapsed summary::after{
+  content:"＋";
+  margin-left:auto;
+  color:#94a3b8;
+  font-size:11px;
+}
+.ai-collapsed[open] summary::after{
+  content:"−";
+}
+.ai-collapsed:not([open]){
+  padding:6px 8px;
+}
+@media(max-width:700px){
+  .view-nav{
+    top:43px;
+    margin:1px 0 4px;
+    padding:2px;
+  }
+  .view-nav button{
+    padding:6px 10px;
+    font-size:11px;
+  }
+  .market-banner.compact-banner{
+    margin:3px 0 5px;
+    padding:5px 7px;
+  }
+  .market-banner.compact-banner strong{
+    font-size:13px;
+  }
+  .metrics-grid,
+  .compact-metrics{
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:3px;
+    margin-bottom:4px;
+  }
+  .compact-metrics .metric{
+    padding:4px 2px;
+  }
+  .compact-metrics .metric strong{
+    font-size:12px;
+  }
+  .metric span,.metric small{
+    font-size:7px;
+  }
+  .live-market{
+    margin-top:4px;
+    padding:6px 7px;
+  }
+  .ai-collapsed:not([open]){
+    padding:5px 6px;
+  }
+}
