@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "/templeton-api").replace(/\/$/, "");
 const SCORE_KEYS = ["value", "price", "pessimism", "quality", "growth", "risk"];
@@ -856,4 +856,6 @@ function App() {
   );
 }
 
-export default function AppWithErrorBoundary() {\n  return <AppErrorBoundary><App /></AppErrorBoundary>;\n}
+export default function AppWithErrorBoundary() {
+  return <AppErrorBoundary><App /></AppErrorBoundary>;
+}
