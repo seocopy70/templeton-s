@@ -297,3 +297,57 @@ footer{margin-top:16px;padding-top:8px}
   .hero{padding-top:8px}
   .hero h2{font-size:21px}
 }
+
+
+/* 2026-09-27 live dashboard readability */
+:root{
+  --ink:#172033;
+  --muted:#64748b;
+  --line:#dfe6ef;
+  --panel:#ffffff;
+  --blue:#2563eb;
+  --blue-soft:#eff6ff;
+  --green:#16a34a;
+  --green-soft:#ecfdf3;
+  --red:#dc2626;
+  --red-soft:#fef2f2;
+  --orange:#d97706;
+  --orange-soft:#fff7ed;
+  --purple:#7c3aed;
+  --purple-soft:#f5f3ff;
+}
+.up{color:var(--green)!important}.down{color:var(--red)!important}
+.metric:nth-child(1){border-top:3px solid var(--blue)}
+.metric:nth-child(2){border-top:3px solid var(--purple)}
+.metric:nth-child(3){border-top:3px solid var(--green)}
+.metric:nth-child(4){border-top:3px solid var(--red)}
+.live-market{margin-top:9px;background:linear-gradient(180deg,#fff,#f8fbff);border:1px solid #cfe0f5;border-radius:12px;padding:10px 12px;box-shadow:0 2px 8px rgba(37,99,235,.06)}
+.live-market-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+.live-market-head>div{display:flex;align-items:center;gap:8px}
+.live-market-head strong{font-size:14px}
+.live-clock{font-size:9px;color:#64748b}
+.live-market-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+.live-market-card{display:grid;grid-template-columns:1fr auto;grid-template-rows:auto auto;gap:2px 7px;padding:7px 9px;border:1px solid #e1eaf5;border-radius:8px;background:#fff}
+.live-market-name{grid-column:1/-1;color:#52627a;font-size:9px;font-weight:750}
+.live-market-card strong{font-size:14px;color:#172033}
+.live-market-card span{font-size:10px;font-weight:800;text-align:right;align-self:end}
+.live-empty{grid-column:1/-1;padding:10px;color:#64748b;font-size:11px}
+.dashboard-main{display:grid;grid-template-columns:minmax(230px,.8fr) minmax(0,1.5fr);gap:9px;margin-top:10px}
+.watch-panel,.selected-detail{min-width:0}
+.watch-list{display:grid;gap:4px}
+.watch-item{width:100%;display:grid;grid-template-columns:minmax(0,1.4fr) auto auto 42px;align-items:center;gap:7px;padding:8px;border:1px solid #e5eaf1;border-radius:8px;background:#fff;text-align:left;color:var(--ink)}
+.watch-item:hover{border-color:#9bbcf1;background:#f8fbff}
+.watch-item.selected{border-color:#60a5fa;background:#eff6ff;box-shadow:inset 3px 0 0 #2563eb}
+.watch-name b,.watch-name small{display:block}.watch-name b{font-size:11px}.watch-name small{font-size:8px;color:#94a3b8;margin-top:1px}
+.watch-price{font-size:11px;font-weight:700}.watch-change{font-size:10px;font-weight:800}.watch-score{min-width:35px;padding:3px 4px;border-radius:5px;text-align:center;font-size:10px;font-weight:800;background:#f1f5f9}
+.watch-score.strong,.watch-score.positive{background:var(--green-soft);color:#166534}.watch-score.caution{background:var(--orange-soft);color:#9a3412}.watch-score.danger{background:var(--red-soft);color:#991b1b}
+.selected-detail{padding:12px;border-color:#d7e2ef}
+.selected-head,.selected-price-row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.selected-head h2{font-size:18px;margin:2px 0}.selected-price-row{margin:8px 0}
+.selected-price{font-size:25px;letter-spacing:-.03em}.selected-score{padding:6px 10px;border-radius:8px;background:var(--purple-soft);color:#6d28d9;text-align:right}.selected-score span{display:block;font-size:8px}.selected-score strong{font-size:20px}.selected-score.strong,.selected-score.positive{background:var(--green-soft);color:#166534}.selected-score.caution{background:var(--orange-soft);color:#9a3412}.selected-score.danger{background:var(--red-soft);color:#991b1b}
+.selected-chart{margin-top:5px;padding-top:6px;border-top:1px solid #edf1f5}.selected-chart .mini-chart{height:55px;color:#2563eb}
+.selected-facts{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.selected-facts span{padding:5px 7px;border-radius:6px;background:#f8fafc;color:#64748b;font-size:9px}.selected-facts b{color:#334155}
+.ai-box{margin-top:8px;padding:9px;border:1px solid #ddd4fe;border-radius:8px;background:linear-gradient(135deg,#faf8ff,#fff)}.ai-box.empty{color:#64748b;border-color:#e2e8f0;background:#f8fafc}.ai-head{display:flex;justify-content:space-between;align-items:center;color:#6d28d9;font-size:11px;font-weight:800}.ai-comment{margin:6px 0;color:#334155;font-size:10px;line-height:1.5}.ai-columns{display:grid;grid-template-columns:1fr 1fr;gap:8px}.ai-columns>div{padding:6px;background:#fff;border-radius:6px}.ai-columns b{font-size:9px}.ai-positive{color:#15803d}.ai-negative{color:#c2410c}.ai-columns ul{margin:4px 0 0;padding-left:14px}.ai-columns li,.ai-columns p{margin:0 0 2px;color:#475569;font-size:9px;line-height:1.4}.ai-sub{display:flex;gap:7px;margin-top:6px;padding-top:5px;border-top:1px solid #eee8ff;font-size:9px;line-height:1.4}.ai-sub b{color:#6d28d9;white-space:nowrap}.ai-sub span{color:#475569}
+.risk-panel{margin-top:9px;padding:10px 12px;border:1px solid #e6eaf0;border-radius:10px;background:#fff}.risk-panel .section-heading{margin-bottom:6px;padding-bottom:5px}.risk-count{padding:3px 7px;border-radius:99px;background:var(--green-soft);color:#15803d;font-size:9px;font-weight:800}.risk-count.active{background:var(--orange-soft);color:#b45309}.risk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.risk-chip{display:flex;flex-direction:column;gap:2px;padding:7px 8px;border-left:3px solid #94a3b8;border-radius:6px;background:#f8fafc}.risk-chip b{font-size:10px}.risk-chip span{font-size:9px;color:#64748b}.risk-chip.caution{border-left-color:var(--orange);background:var(--orange-soft)}.risk-chip.danger{border-left-color:var(--red);background:var(--red-soft)}.risk-clear{padding:7px 9px;background:var(--green-soft);color:#166534;border-radius:6px;font-size:10px;font-weight:700}
+@media(max-width:1100px){.live-market-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.dashboard-main{grid-template-columns:1fr}.risk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.live-market-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.live-market-card strong{font-size:12px}.risk-grid{grid-template-columns:1fr}.ai-columns{grid-template-columns:1fr}.watch-item{grid-template-columns:minmax(0,1fr) auto auto 38px}}
