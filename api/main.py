@@ -28,6 +28,11 @@ from market_data import fetch_all_prices
 from market_overview import fetch_market_overview
 from score_engine import calculate_templeton_score
 from decision_log import recent_decisions, decisions_as_table_rows
+import os
+import psycopg2
+from dotenv import load_dotenv
+
+load_dotenv(ROOT / "config" / ".env")
 
 app = FastAPI(title="Templeton S API", version="0.1.0")
 
@@ -154,6 +159,72 @@ def market_overview(force: bool = Query(False)) -> dict[str, Any]:
         return data
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"market overview unavailable: {exc}") from exc
+
+
+@app.get("/panic-watch")
+def panic_watch(
+    limit: int = Query(30, ge=1, le=100),
+) -> dict[str, Any]:
+    """Return the latest persisted panic/snapshot history.
+
+    This reads the production snapshot tables only; opening the app does not
+    create or mutate historical records.
+    """
+    url = os.getenv("NEON_DATABASE_URL")
+    if not url:
+        raise HTTPException(status_code=503, detail="snapshot database unavailable")
+
+    try:
+        with psycopg2.connect(url) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    select
+                        p.detected_at,
+                        p.snapshot_id,
+                        p.panic_type,
+                        p.market_regime,
+                        p.details,
+                        s.captured_at,
+                        s.market_data
+                    from panic_events p
+                    join market_snapshots s on s.snapshot_id = p.snapshot_id
+                    order by p.detected_at desc
+                    limit %s
+                    """,
+                    (limit,),
+                )
+                rows = cur.fetchall()
+
+        items = []
+        for detected_at, snapshot_id, panic_type, market_regime, details, captured_at, market_data in rows:
+            stocks = (market_data or {}).get("stocks") or []
+            items.append({
+                "snapshot_id": str(snapshot_id),
+                "captured_at": captured_at.isoformat() if captured_at else None,
+                "detected_at": detected_at.isoformat() if detected_at else None,
+                "panic_type": panic_type,
+                "market_regime": market_regime,
+                "details": details or {},
+                "stocks": [
+                    {
+                        "symbol": stock.get("code"),
+                        "name": stock.get("name"),
+                        "price": (stock.get("price") or {}).get("current_price"),
+                        "change_rate": (stock.get("price") or {}).get("change_rate"),
+                        "score": (stock.get("score") or {}).get("total"),
+                        "opinion": (stock.get("score") or {}).get("opinion"),
+                        "panic": stock.get("panic") or {},
+                    }
+                    for stock in stocks
+                ],
+            })
+
+        return {"ok": True, "items": items}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"panic watch unavailable: {exc}") from exc
 
 
 @app.get("/decisions")
