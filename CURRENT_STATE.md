@@ -100,10 +100,10 @@ collection_run → market_snapshot → raw/context data + score
 
 ## 다음 작업
 
-React 이식과 기본 운영 Snapshot 수집은 완료되었다. 다음은 **누적 데이터를 실제 화면/분석에 연결하는 단계**다.
+Panic Watch 기본 연결까지 완료했으며 Oracle 반영/검증이 남아 있다. 이후 **사후 outcome 검증 구조**로 넘어간다.
 
-1. Panic Watch API/화면을 누적 `market_snapshots`/`panic_events` 기반으로 연결
-2. AI 판단을 원래 Snapshot과 분리된 사후 outcome 구조로 기록·검증
+1. Oracle에서 Panic Watch API/React build 반영 및 실제 Snapshot 1건 표시 확인
+2. AI 판단과 이후 실제 시장 결과를 분리 기록하여 사후검증 구조 마련
 3. FRED/매크로 실제 데이터 컨텍스트를 Snapshot에 연결
 4. 충분한 데이터가 쌓인 뒤 AI 모델 비교/교체 가능 구조를 실제 운용
 5. 이후 필요한 UI 개선은 실제 축적 데이터에 맞춰 단계적으로 진행
@@ -128,6 +128,14 @@ React 이식과 기본 운영 Snapshot 수집은 완료되었다. 다음은 **�
   - 앱 실행 → 현재 데이터 조회/표시
   - cron → 시점 Snapshot/AI 판단 축적
 
+
+## 2026-09-27 Panic Watch 1차 구현
+
+- FastAPI `/panic-watch` 추가: Neon의 `market_snapshots` + `panic_events` 누적 기록을 읽기 전용으로 제공
+- React에 Panic Watch 패널 추가: Snapshot 시점, 시장 regime, 정상/활성 위험 신호, 관련 종목, KODEX 200 등락률 표시
+- 앱 조회는 DB를 변경하지 않고 누적 Snapshot을 읽기만 함
+- GitHub 기준 코드 반영 완료
+- 다음: Oracle pull → FastAPI 재시작 → React build → 브라우저 검증
 
 ## 기록 원칙
 
