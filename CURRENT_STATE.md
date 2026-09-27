@@ -4,54 +4,43 @@
 
 ## 현재 단계
 
-**Phase 2 — 새 React 버전 작성 단계 (1차 구현 완료, 빌드 검증 대기)**
+**Phase 3 — 새 React 이식 및 Oracle 배포 완료**
 
-## 가장 중요한 작업 기준
+## 작업 기준
 
-### 기존 Oracle React를 수정하는 것이 아니다
+- 기능/화면 Source of Truth: 정상 작동하는 기존 Streamlit
+- 최종 React: Streamlit을 기준으로 새로 작성
+- 기존 Oracle React: 프로토타입/검증용이며 최종본으로 사용하지 않음
+- Oracle: 새 React production build의 배포 대상
 
-현재 Templeton S React 작업의 기준은 다음과 같이 확정한다.
-
-- **기능/화면 Source of Truth:** 정상 작동하는 기존 Streamlit
-- **최종 React:** Streamlit을 기준으로 **새로 작성**
-- **기존 Oracle React:** 이전에 만든 프로토타입/검증용 구현. 최종 구현의 출발점이 아님.
-- **Oracle의 역할:** 새 React가 완성·검증된 뒤 최종 build를 배포하는 대상 서버.
-- **최종 배포:** 새 React build로 기존 Oracle React 배포본을 덮어쓴다.
-
-따라서 앞으로 작업 지시에서 “React 이식”, “React 수정”, “Oracle React 작업”이라고 표현하더라도 별도 지시가 없는 한 **기존 Oracle React를 계속 패치하는 의미로 해석하지 않는다.**
-
-기본 작업 흐름:
-
+기본 흐름:
 ```
 Streamlit
-   ↓
+  ↓
 새 React 작성
-   ↓
+  ↓
 검증된 FastAPI / KIS / Score 연결
-   ↓
+  ↓
 실데이터 검증
-   ↓
+  ↓
 GitHub 기준본
-   ↓
-Oracle 새 build 배포
-   ↓
+  ↓
+Oracle 새 build
+  ↓
 기존 Oracle React 덮어쓰기
 ```
 
-### 지금까지 완료된 것은 무엇인가
+## 2026-09-27 React 이식/배포 완료
 
-이전 작업에서 다음은 이미 완료/검증된 상태다.
-
-1. Oracle React 프로토타입 작성 및 흰 화면 문제 해결
-2. FastAPI adapter 작성
-3. Oracle FastAPI `/scores` 실데이터 검증
-4. 공개 `/templeton/` 및 `/templeton-api/scores` 검증
-5. 실제 KIS 데이터 + Templeton Score가 React/API 경로에서 전달되는 것 확인
-6. React의 일부 API 연동 및 가격 History 연결 방향 확인
-
-이 작업들은 **최종 새 React를 완성한 것이 아니라, 새 React를 만들 때 사용할 API/데이터/배포 정보를 검증한 이전 단계**다.
-
-따라서 기존 Oracle React를 계속 고쳐서 최종본으로 만드는 작업은 하지 않는다.
+- GitHub `origin/main`을 Oracle `main`에 동기화: `e0a7646`
+- 기존 Oracle 로컬 작업물은 `~/templeton-backup-20260927/`에 백업
+- 새 `frontend/`의 Oracle production build 성공
+- `npm ci`는 lockfile 부재로 실패했지만 `npm run build`는 정상 성공
+- Caddy가 `/templeton/*`을 `~/templeton-s/frontend/dist`에서 서비스하는 구조 확인
+- 실제 FastAPI `/health` 정상
+- 실제 `/scores`에서 KIS/Templeton Score 데이터 반환 확인
+- 브라우저의 `/templeton/`에서 새 React 대시보드 정상 표시 확인
+- 따라서 **React 이식 및 Oracle 배포는 완료**로 판정한다.
 
 ## 현재 알려진 구조
 
@@ -66,14 +55,13 @@ Oracle 새 build 배포
 
 ## KIS 상태 — 닫힘
 
-KIS 연동은 현재 단계에서 **정상 동작으로 간주하고 종료**한다.
+KIS 연동은 현재 단계에서 정상 동작으로 간주하고 종료한다.
 
 - Streamlit에서 KIS 데이터 수신 확인
 - Oracle에서 KIS 데이터 수집 확인
-- 기존 KISClient를 사용하는 실제 데이터 경로 확인
-- GitHub Actions의 과거 인증 문제는 새 수집 경로가 실제 Oracle에서 실패할 때 다시 본다.
+- 실제 React/API 경로에서도 KIS 데이터 표시 확인
 
-따라서 지금은 KIS 인증/Secret 문제를 추가로 파고들지 않는다.
+과거 GitHub Actions 인증 문제는 실제 새 수집 경로에서 실패할 때 다시 본다.
 
 ## 핵심 운영/데이터 아키텍처 — 2026-09-26 확정
 
@@ -110,34 +98,16 @@ collection_run → market_snapshot → raw/context data + score
 
 지금은 모델 교체보다 데이터 수집 → Snapshot → Score → AI 판단 → Neon 기록의 안정화가 우선이다. provider/model/version을 교체 가능하게 보존하고, 충분한 데이터가 쌓인 뒤 동일 Snapshot 기반으로 모델을 비교한다.
 
-## 새 React 1차 구현 — 2026-09-27
-
-Streamlit `app.py`를 기능/화면 기준으로 삼아 기존 Oracle React와 분리된 새 Vite/React 구현을 `frontend/`에 작성했다.
-
-구성:
-- `frontend/App.jsx`: 현재 상태, 6종목, Templeton Score 6요소, 상세 입력값, 가격 History, 최근 판단, 데이터 상태
-- `frontend/styles.css`: 반응형 대시보드 UI
-- `frontend/main.jsx`, `index.html`, `vite.config.js`: 독립 Vite 실행 구조
-- 실제 FastAPI `/scores`, `/prices/{symbol}/history`, `/market-overview`, `/decisions` 연결
-- mock 주식 데이터 없음. API 실패 시 오류 상태를 표시
-- `/templeton/` public path를 새 Vite build의 base로 설정
-- 향후 AI/DART 상세 화면은 해당 데이터를 제공하는 API가 준비된 뒤 실제 데이터로 추가한다. 가짜 결과를 만들지 않는다.
-
-빌드 검증:
-- `.github/workflows/frontend-build.yml`을 추가하여 Node 22 + `npm install` + `npm run build` CI 검증 경로를 만들었다.
-- 현재 실행 환경에서는 외부 DNS가 차단되어 npm 패키지 설치를 통한 로컬 build 실행은 완료하지 못했다. 따라서 **코드 작성 완료와 CI 검증 경로 확보** 상태이며, 실제 build 성공 판정은 GitHub Actions 또는 Oracle에서 확인한다.
-
-## 현재 알려진 문제
-
-기존 문서와 실제 작업본 사이에 차이가 있을 수 있으므로 실제 코드/서버 상태를 우선 확인한다.
-
 ## 다음 작업
 
-1. GitHub Actions 또는 Oracle에서 새 `frontend/`의 실제 `npm run build` 성공을 확인한다.
-2. 새 React를 Oracle의 별도 경로/임시 build로 올려 실제 API와 브라우저에서 검증한다. 기존 Oracle React는 아직 덮어쓰지 않는다.
-3. Streamlit과 새 React의 핵심 수치/화면을 대조하여 누락 기능을 보완한다.
-4. 검증이 끝난 새 React build를 Oracle의 기존 React 배포본에 덮어쓴다.
-5. 이후 자동 수집/AI 판단/운영 개선을 단계적으로 연결한다.
+React 이식은 끝났으므로 다음은 **운영 데이터 파이프라인 완성**이다.
+
+1. Oracle의 평일 09:30 / 17:00 자동 수집이 실제로 안정적으로 실행되는지 확인
+2. 수집 결과가 Neon에 올바른 Snapshot/Score/AI 판단 형태로 기록되는지 확인
+3. Panic Watch가 누적 스냅샷을 이용해 정상적으로 동작하는지 확인
+4. AI 판단과 이후 실제 시장 결과를 분리 기록하여 사후검증 구조를 마련
+5. 충분한 데이터가 쌓인 뒤 AI 모델 비교/교체 가능 구조를 실제 운용
+6. 이후 필요한 화면 개선은 실제 데이터가 확보된 범위에서만 단계적으로 진행
 
 ## 기록 원칙
 
