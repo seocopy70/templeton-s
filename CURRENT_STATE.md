@@ -100,13 +100,14 @@ collection_run → market_snapshot → raw/context data + score
 
 ## 다음 작업
 
-Panic Watch 기본 연결까지 완료했으며 Oracle 반영/검증이 남아 있다. 이후 **사후 outcome 검증 구조**로 넘어간다.
+Panic Watch 기본 연결과 Oracle 검증이 완료되었다. 다음은 **사후 outcome 자동 검증을 실제 운영에 연결**하는 단계다.
 
-1. Oracle에서 Panic Watch API/React build 반영 및 실제 Snapshot 1건 표시 확인
-2. AI 판단과 이후 실제 시장 결과를 분리 기록하여 사후검증 구조 마련
-3. FRED/매크로 실제 데이터 컨텍스트를 Snapshot에 연결
-4. 충분한 데이터가 쌓인 뒤 AI 모델 비교/교체 가능 구조를 실제 운용
-5. 이후 필요한 UI 개선은 실제 축적 데이터에 맞춰 단계적으로 진행
+1. Oracle에서 outcome schema/collector를 pull 후 수동 실행 검증
+2. 평일 18:30 KST outcome evaluator 자동 실행 연결
+3. Snapshot 시점 AI 판단과 1/5/20일 실제 결과를 별도 조회하는 화면/API 연결
+4. FRED/매크로 실제 데이터 컨텍스트를 Snapshot에 연결
+5. 충분한 데이터가 쌓인 뒤 AI 모델 비교/교체 가능 구조를 실제 운용
+6. 이후 필요한 UI 개선은 실제 축적 데이터에 맞춰 단계적으로 진행
 
 ## 2026-09-27 운영 Snapshot 파이프라인 — 완료
 
@@ -136,6 +137,18 @@ Panic Watch 기본 연결까지 완료했으며 Oracle 반영/검증이 남아 �
 - 앱 조회는 DB를 변경하지 않고 누적 Snapshot을 읽기만 함
 - GitHub 기준 코드 반영 완료
 - 다음: Oracle pull → FastAPI 재시작 → React build → 브라우저 검증
+
+## 2026-09-27 Snapshot Outcome 1차 구현
+
+- `snapshot_outcomes`를 종목별 `symbol + horizon_days` 기준으로 확장
+- `scripts/snapshot_outcomes.py` 추가
+  - 원본 Snapshot/AI 판단을 변경하지 않음
+  - 1/5/20일 후 실제 거래일 가격을 KIS 일봉에서 조회
+  - 종목 수익률 및 KODEX 200 대비 수익률을 별도 저장
+  - 원래 Snapshot의 AI opinion을 결과에 보존
+- FastAPI `/snapshot-outcomes` 추가
+- 현재 Snapshot이 1건뿐이므로 아직 평가 대상 horizon이 충분히 경과하지 않은 것은 정상
+- 다음: Oracle pull → 수동 evaluator 실행 → DB 결과 확인 → 평일 18:30 KST 자동화
 
 ## 기록 원칙
 
