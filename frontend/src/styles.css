@@ -144,3 +144,9 @@ footer { display: flex; justify-content: space-between; color: #94a3b8; font-siz
   .content { width: min(100% - 20px, 1440px); padding-top: 20px; }
   footer { flex-direction: column; gap: 6px; }
 }
+
+
+.market-mini-list { display: grid; grid-template-columns: repeat(2, minmax(100px, 1fr)); gap: 5px 16px; min-width: 220px; }
+.market-mini-list div { display: flex; justify-content: space-between; gap: 10px; font-size: 11px; }
+.market-mini-list span { color: #64748b; }
+.market-mini-list strong { font-weight: 750; }
