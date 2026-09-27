@@ -726,7 +726,7 @@ function App() {
                       <strong>{item.score ?? item.total ?? "—"}</strong>
                       <span>{item.opinion || "—"}</span>
                     </div>
-                    <time>{item.ts || item.timestamp || "—"}</time>
+                    <time>{item.created_at ? new Date(item.created_at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : item.ts || item.timestamp || "—"}</time>
                   </div>
                 ))}
               </div>
