@@ -447,3 +447,54 @@ footer{margin-top:16px;padding-top:8px}
   .market-banner.compact-banner{display:flex;align-items:center;justify-content:space-between;gap:8px}
   .market-banner.compact-banner>span{font-size:8px;text-align:right}
 }
+
+
+/* 2026-09-27 fixed navigation + compact mobile header */
+.topbar{
+  position:sticky;
+  top:0;
+  z-index:40;
+}
+.view-nav{
+  position:sticky;
+  top:54px;
+  z-index:35;
+  margin-top:4px;
+  margin-bottom:8px;
+}
+@media(max-width:700px){
+  .topbar{
+    flex-direction:row;
+    align-items:center;
+    padding:6px 8px;
+  }
+  .topbar > div:first-child{min-width:0}
+  .top-actions{
+    width:auto;
+    justify-content:flex-end;
+    flex-shrink:0;
+  }
+  .connection{display:none}
+  .refresh-button{padding:5px 7px;font-size:9px;white-space:nowrap}
+  .view-nav{
+    top:43px;
+    margin:2px 0 6px;
+    width:100%;
+    overflow-x:auto;
+    flex-wrap:nowrap;
+    scrollbar-width:none;
+  }
+  .view-nav::-webkit-scrollbar{display:none}
+  .view-nav button{flex:0 0 auto}
+  .metrics-grid,
+  .compact-metrics{
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:3px;
+  }
+  .compact-metrics .metric{padding:5px 3px;text-align:center}
+  .compact-metrics .metric strong{font-size:13px}
+  .metric span,.metric small{font-size:7px}
+  .market-banner.compact-banner{
+    margin-top:5px;
+  }
+}
