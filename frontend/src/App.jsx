@@ -157,6 +157,186 @@ function signalLabel(signal) {
   }[signal] || "—";
 }
 
+
+function MarketTrend({ item }) {
+  const values = (item?.closes || []).map(Number).filter(Number.isFinite);
+  if (values.length < 2) {
+    return <div className="chart-empty">추이 데이터 없음</div>;
+  }
+  const width = 420;
+  const height = 150;
+  const pad = 8;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const points = values.map((v, i) => {
+    const x = pad + (i / (values.length - 1)) * (width - pad * 2);
+    const y = height - pad - ((v - min) / range) * (height - pad * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const first = values[0];
+  const last = values[values.length - 1];
+  const change = first ? ((last / first) - 1) * 100 : null;
+
+  return (
+    <div className="market-trend-card">
+      <div className="market-trend-head">
+        <div>
+          <strong>{item.name}</strong>
+          <span>{item.source || "—"}</span>
+        </div>
+        <b className={change >= 0 ? "up" : "down"}>{pct(change)}</b>
+      </div>
+      <svg className="market-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${item.name} 최근 추이`}>
+        <polyline points={points} fill="none" stroke="currentColor" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+      </svg>
+      <div className="market-trend-foot"><span>약 1개월</span><span>{number(item.price, 2)}</span></div>
+    </div>
+  );
+}
+
+function MarketOverview({ market }) {
+  const items = (market?.items || []).filter((item) => item.ok);
+  return (
+    <section className="section">
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">MARKET OVERVIEW</span>
+          <h2>시장 기본 정보 · 최근 추이</h2>
+        </div>
+        <span className="muted">{items.length ? `${items.length}개 지표 · 최근 약 1개월` : "시장 지표 조회 중"}</span>
+      </div>
+      {items.length === 0 ? (
+        <div className="panel"><p className="muted">시장 지표를 불러오지 못했습니다.</p></div>
+      ) : (
+        <>
+          <div className="market-index-grid">
+            {items.map((item) => (
+              <div className="market-index-card" key={item.key}>
+                <span>{item.name}</span>
+                <strong>{number(item.price, 2)}</strong>
+                <b className={Number(item.change_rate) >= 0 ? "up" : "down"}>{signed(item.change_rate)}%</b>
+              </div>
+            ))}
+          </div>
+          <div className="market-trend-grid">
+            {items.map((item) => <MarketTrend item={item} key={`${item.key}-trend`} />)}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+function WatchlistTable({ rows }) {
+  return (
+    <div className="table-wrap">
+      <table className="data-table watch-table">
+        <thead><tr><th>종목</th><th>현재가</th><th>등락률</th><th>52주 고점 대비</th><th>PER</th><th>PBR</th><th>Score</th><th>의견</th></tr></thead>
+        <tbody>
+          {rows.map((row) => {
+            const score = row.score || {};
+            const vi = score.value_inputs || {};
+            return (
+              <tr key={row.symbol}>
+                <td><strong>{row.name}</strong><small>{row.symbol}</small></td>
+                <td>{number(row.current_price, 0)}원</td>
+                <td className={Number(row.change_rate) >= 0 ? "up" : "down"}>{signed(row.change_rate)}%</td>
+                <td>{pct(row.drop_from_52w_high)}</td>
+                <td>{number(vi.per, 1)}</td>
+                <td>{number(vi.pbr, 2)}</td>
+                <td><strong>{number(score.total)}</strong></td>
+                <td><span className={`pill ${opinionTone(score.opinion)}`}>{score.opinion || "—"}</span></td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Disclosures({ items }) {
+  return (
+    <section className="section">
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">DART DISCLOSURES</span>
+          <h2>최근 공시</h2>
+        </div>
+        <span className="muted">{items.length ? `${items.length}건` : "최근 공시 없음"}</span>
+      </div>
+      {items.length === 0 ? (
+        <div className="panel"><p className="muted">공시가 없거나 DART API를 사용할 수 없습니다.</p></div>
+      ) : (
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead><tr><th>일자</th><th>종목</th><th>제목</th><th>분류</th><th>중요도</th><th>가치영향</th></tr></thead>
+            <tbody>
+              {items.map((item, i) => (
+                <tr key={item.event_id || i}>
+                  <td>{item.ts || "—"}</td>
+                  <td><strong>{item.name || item.symbol}</strong></td>
+                  <td>{item.url ? <a href={item.url} target="_blank" rel="noreferrer">{item.title || "—"}</a> : item.title || "—"}</td>
+                  <td>{item.category || "—"}</td>
+                  <td>{item.importance || "—"}</td>
+                  <td>{item.value_impact || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function OutcomePanel({ outcomes }) {
+  const ready = outcomes.filter((x) => x.return_pct !== null && x.return_pct !== undefined);
+  return (
+    <section className="section">
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">POST-HOC VALIDATION</span>
+          <h2>사후 검증</h2>
+        </div>
+        <span className="muted">{ready.length ? `${ready.length}건 결과` : "아직 평가 결과 없음"}</span>
+      </div>
+      {outcomes.length === 0 ? (
+        <div className="panel outcome-empty">
+          <strong>아직 검증할 결과가 없습니다.</strong>
+          <p>Snapshot이 쌓이고 1·5·20일 horizon이 지나면 자동으로 결과가 축적됩니다.</p>
+        </div>
+      ) : (
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead><tr><th>평가일</th><th>종목</th><th>기간</th><th>기준가</th><th>현재/미래가</th><th>수익률</th><th>KODEX 200</th><th>상대성과</th></tr></thead>
+            <tbody>
+              {outcomes.map((item, i) => {
+                const relative = item.return_pct != null && item.benchmark_return_pct != null
+                  ? Number(item.return_pct) - Number(item.benchmark_return_pct) : null;
+                const horizon = item.horizon_days === 1 ? "1일" : item.horizon_days === 5 ? "5일" : item.horizon_days === 20 ? "20일" : `${item.horizon_days}일`;
+                return (
+                  <tr key={`${item.snapshot_id}-${item.symbol}-${item.horizon_days}-${i}`}>
+                    <td>{item.evaluated_at ? new Date(item.evaluated_at).toLocaleDateString("ko-KR") : "—"}</td>
+                    <td>{item.result?.name || item.symbol}</td>
+                    <td>{horizon}</td>
+                    <td>{number(item.reference_price, 0)}</td>
+                    <td>{number(item.future_price, 0)}</td>
+                    <td className={Number(item.return_pct) >= 0 ? "up" : "down"}>{pct(item.return_pct)}</td>
+                    <td>{pct(item.benchmark_return_pct)}</td>
+                    <td className={Number(relative) >= 0 ? "up" : "down"}>{pct(relative)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function PanicWatch({ items }) {
   const panicCount = items.filter((item) => item.panic_type && item.panic_type !== "none").length;
 
@@ -284,6 +464,8 @@ function App() {
   const [market, setMarket] = useState(null);
   const [decisions, setDecisions] = useState([]);
   const [panicWatch, setPanicWatch] = useState([]);
+  const [disclosures, setDisclosures] = useState([]);
+  const [outcomes, setOutcomes] = useState([]);
   const [history, setHistory] = useState({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -322,12 +504,36 @@ function App() {
     }
   }, []);
 
-  const loadDecisions = useCallback(async () => {
+  const loadDisclosures = useCallback(async () => {
     try {
-      const data = await getJson("/decisions?limit=30");
+      const data = await getJson("/disclosures?limit=30");
+      setDisclosures(data.items || []);
+    } catch {
+      setDisclosures([]);
+    }
+  }, []);
+
+  const loadOutcomes = useCallback(async () => {
+    try {
+      const data = await getJson("/snapshot-outcomes?limit=60");
+      setOutcomes(data.items || []);
+    } catch {
+      setOutcomes([]);
+    }
+  }, []);
+
+  const loadJudgments = useCallback(async () => {
+    try {
+      const data = await getJson("/ai-judgments?limit=30");
       setDecisions(data.items || []);
     } catch {
-      setDecisions([]);
+      // Keep the existing legacy /decisions fallback.
+      try {
+        const data = await getJson("/decisions?limit=30");
+        setDecisions(data.items || []);
+      } catch {
+        setDecisions([]);
+      }
     }
   }, []);
 
@@ -351,8 +557,8 @@ function App() {
   }, [history]);
 
   const refreshAll = useCallback(async (force = true) => {
-    await Promise.all([loadScores(force), loadMarket(), loadDecisions(), loadPanicWatch()]);
-  }, [loadScores, loadMarket, loadDecisions, loadPanicWatch]);
+    await Promise.all([loadScores(force), loadMarket(), loadJudgments(), loadDisclosures(), loadOutcomes(), loadPanicWatch()]);
+  }, [loadScores, loadMarket, loadJudgments, loadDisclosures, loadOutcomes, loadPanicWatch]);
 
   useEffect(() => {
     refreshAll(false);
@@ -441,6 +647,19 @@ function App() {
           </div>
         </section>
 
+        <MarketOverview market={market} />
+
+        <section className="section">
+          <div className="section-heading">
+            <div>
+              <span className="eyebrow">WATCHLIST TABLE</span>
+              <h2>관심 종목 한눈에 보기</h2>
+            </div>
+            <span className="muted">현재 조회값</span>
+          </div>
+          {loading ? <div className="panel"><p className="muted">조회 중…</p></div> : <WatchlistTable rows={validRows} />}
+        </section>
+
         <section className="section">
           <div className="section-heading">
             <div>
@@ -479,7 +698,11 @@ function App() {
           )}
         </section>
 
+        <Disclosures items={disclosures} />
+
         <PanicWatch items={panicWatch} />
+
+        <OutcomePanel outcomes={outcomes} />
 
         <section className="section two-col">
           <div className="panel">
