@@ -109,6 +109,16 @@ React 이식은 끝났으므로 다음은 **운영 데이터 파이프라인 완
 5. 충분한 데이터가 쌓인 뒤 AI 모델 비교/교체 가능 구조를 실제 운용
 6. 이후 필요한 화면 개선은 실제 데이터가 확보된 범위에서만 단계적으로 진행
 
+## 2026-09-27 운영 Snapshot 파이프라인 준비
+
+- 기존 `scripts/daily_log.py`의 실데이터 수집 → Score → Regime/Panic → JSONL 기록을 Oracle에서 실제 실행해 정상 동작 확인
+- 확인 결과 기존 daily_log는 Neon/AI 판단을 저장하지 않음
+- 기존 수집기를 건드리지 않고 additive 방식의 Neon Snapshot 스키마 `db/snapshot_schema.sql` 추가
+- production collector `scripts/snapshot_collect.py` 추가
+- 목표: KIS + Score + 시장상태 + Panic + 이벤트 컨텍스트 → Neon `market_snapshots` → Groq/Llama 판단 → `ai_judgments` → `panic_events`
+- `snapshot_outcomes`는 사후검증용 테이블로 먼저 준비하며 실제 outcome 계산은 별도 단계
+- 현재 다음 단계: Oracle에서 pull 후 snapshot schema/collector 1회 수동 실행 및 Neon 저장 검증
+
 ## 기록 원칙
 
 이 파일에는 작업 연속성에 필요한 최소한의 내용만 기록한다. 주요 단계가 끝날 때 현재 단계/완료/문제/다음 작업만 갱신한다.
