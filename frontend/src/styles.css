@@ -638,3 +638,45 @@ footer{margin-top:16px;padding-top:8px}
     grid-template-columns:1fr;
   }
 }
+
+
+/* 2026-09-27 final compact horizontal information layout */
+.metrics-grid,.compact-metrics{
+  grid-template-columns:repeat(4,minmax(0,1fr));
+}
+.section-heading.compact > div{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  min-width:0;
+}
+.section-heading.compact > div .eyebrow{
+  flex:0 0 auto;
+}
+.section-heading.compact > div h2{
+  margin:0;
+}
+.risk-grid{
+  grid-template-columns:repeat(3,minmax(0,1fr));
+}
+@media(max-width:700px){
+  .metrics-grid,.compact-metrics{
+    grid-template-columns:repeat(4,minmax(0,1fr));
+  }
+  .compact-metrics .metric{
+    min-width:0;
+    padding-left:2px;
+    padding-right:2px;
+  }
+  .compact-metrics .metric strong{
+    font-size:12px;
+  }
+  .metric span,.metric small{
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .risk-grid{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+}
