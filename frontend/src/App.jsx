@@ -489,19 +489,19 @@ function AIJudgment({ judgment }) {
   const negatives = list(judgment.negatives);
   const conditions = list(judgment.change_conditions);
   return (
-    <div className="ai-box">
-      <div className="ai-head">
+    <details className="ai-box ai-collapsed">
+      <summary className="ai-head">
         <span>🤖 AI 판단</span>
         <span className={`pill ${opinionTone(judgment.opinion)}`}>{judgment.opinion || "—"}</span>
-      </div>
+      </summary>
       {judgment.comment && <p className="ai-comment">{judgment.comment}</p>}
       <div className="ai-columns">
-        <div><b className="ai-positive">긍정</b>{positives.length ? <ul>{positives.slice(0,3).map((x,i)=><li key={i}>{x}</li>)}</ul> : <p>—</p>}</div>
-        <div><b className="ai-negative">주의</b>{negatives.length ? <ul>{negatives.slice(0,3).map((x,i)=><li key={i}>{x}</li>)}</ul> : <p>—</p>}</div>
+        <div><b className="ai-positive">긍정</b>{positives.length ? <ul>{positives.slice(0,3).map((x,i)=><li key={i}>{x}</li></ul>) : <p>—</p>}</div>
+        <div><b className="ai-negative">주의</b>{negatives.length ? <ul>{negatives.slice(0,3).map((x,i)=><li key={i}>{x}</li></ul>) : <p>—</p>}</div>
       </div>
       {judgment.counter_argument && <div className="ai-sub"><b>반대 논거</b><span>{judgment.counter_argument}</span></div>}
       {conditions.length > 0 && <div className="ai-sub"><b>판단 변경 조건</b><span>{conditions.slice(0,2).join(" · ")}</span></div>}
-    </div>
+    </details>
   );
 }
 
@@ -793,6 +793,10 @@ function App() {
         </nav>
 
         {activeView === "dashboard" && <>
+          <section className="market-banner compact-banner">
+            <div><span className="eyebrow">현재 시장 스냅샷</span><strong>{marketChange == null ? "시장 데이터 확인 중" : marketChange <= -1 ? "하락세 → 위험회피" : marketChange >= 1 ? "상승세 → 위험선호" : "보합 → 중립"}</strong></div>
+            <span>KODEX 200 {marketChange == null ? "—" : signed(marketChange) + "%"} · 상승 {upCount} · 하락 {downCount}</span>
+          </section>
           <section className="metrics-grid compact-metrics">
             <Metric label="조회 종목" value={`${validRows.length} / ${rows.length || 6}`} />
             <Metric label="평균 Score" value={avgScore == null ? "—" : number(avgScore)} />
@@ -800,10 +804,6 @@ function App() {
             <Metric label="하락" value={`${downCount}개`} />
           </section>
           <MarketTicker items={marketLive || []} updatedAt={marketLiveAt} />
-          <section className="market-banner compact-banner">
-            <div><span className="eyebrow">현재 시장 스냅샷</span><strong>{marketChange == null ? "시장 데이터 확인 중" : marketChange <= -1 ? "위험회피" : marketChange >= 1 ? "위험선호" : "중립"}</strong></div>
-            <span>KODEX 200 {marketChange == null ? "—" : signed(marketChange) + "%"} · 상승 {upCount} · 하락 {downCount}</span>
-          </section>
           <section className="dashboard-main">
             <WatchlistPanel rows={validRows} selectedSymbol={selectedSymbol === "전체" ? (validRows[0]?.symbol || "") : selectedSymbol} onSelect={setSelectedSymbol} />
             <SelectedStockDetail row={validRows.find((r) => r.symbol === (selectedSymbol === "전체" ? validRows[0]?.symbol : selectedSymbol)) || validRows[0]} history={history[validRows.find((r) => r.symbol === (selectedSymbol === "전체" ? validRows[0]?.symbol : selectedSymbol))?.symbol]} judgment={decisions.find((d) => d.symbol === (selectedSymbol === "전체" ? validRows[0]?.symbol : selectedSymbol))} />
