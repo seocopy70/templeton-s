@@ -193,3 +193,25 @@ footer { display: flex; justify-content: space-between; color: #94a3b8; font-siz
 .watch-table td:nth-child(n+2){text-align:right}
 .outcome-empty{padding:22px}
 .outcome-empty strong{display:block;margin-bottom:5px}
+
+
+/* 2026-09-27 dashboard density tuning */
+.market-index-grid{grid-template-columns:repeat(5,minmax(0,1fr));}
+.market-trend-grid{grid-template-columns:repeat(5,minmax(0,1fr));}
+.market-trend-card{padding:10px;}
+.market-chart{height:72px;margin:4px 0;}
+.market-trend-foot{font-size:.68rem;}
+.score-bars{padding:9px 0 2px;}
+.score-row{margin-bottom:5px;}
+.score-row-label{margin-bottom:2px;font-size:10px;}
+.score-track{height:4px;}
+.disclosure-scroll,.decision-scroll{max-height:300px;overflow-y:auto;overscroll-behavior:contain;}
+.disclosure-scroll .data-table{min-width:700px;}
+.decision-scroll{border-top:1px solid #eef2f7;}
+.decision-scroll .decision-list{border-top:0;}
+@media (max-width:1100px){
+  .market-index-grid,.market-trend-grid{grid-template-columns:repeat(3,minmax(0,1fr));}
+}
+@media (max-width:700px){
+  .market-index-grid,.market-trend-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+}
