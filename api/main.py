@@ -28,6 +28,7 @@ from market_data import fetch_all_prices
 from market_overview import fetch_market_overview
 from score_engine import calculate_templeton_score
 from decision_log import recent_decisions, decisions_as_table_rows
+from events.dart_client import DartClient
 import os
 import psycopg2
 from dotenv import load_dotenv
@@ -49,7 +50,9 @@ app.add_middleware(
 _client = KISClient()
 _scores_cache: dict[str, Any] = {"expires": 0.0, "data": None}
 _market_cache: dict[str, Any] = {"expires": 0.0, "data": None}
+_disclosure_cache: dict[str, Any] = {"expires": 0.0, "data": None}
 _CACHE_SECONDS = 60
+_DISCLOSURE_CACHE_SECONDS = 600
 
 
 def _get_scores(force: bool = False) -> list[dict[str, Any]]:
@@ -159,6 +162,106 @@ def market_overview(force: bool = Query(False)) -> dict[str, Any]:
         return data
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"market overview unavailable: {exc}") from exc
+
+
+
+@app.get("/disclosures")
+def disclosures(
+    limit: int = Query(30, ge=1, le=100),
+) -> dict[str, Any]:
+    """Return recent DART disclosures for the configured watchlist."""
+    now = time.time()
+    cached = _disclosure_cache.get("data")
+    if cached is not None and now < _disclosure_cache["expires"]:
+        return {"ok": True, "items": cached[:limit]}
+
+    api_key = os.getenv("DART_API_KEY", "")
+    if not api_key:
+        _disclosure_cache["data"] = []
+        _disclosure_cache["expires"] = now + _DISCLOSURE_CACHE_SECONDS
+        return {"ok": True, "items": [], "enabled": False}
+
+    client = DartClient(api_key)
+    items: list[dict[str, Any]] = []
+    for symbol, name in SYMBOLS.items():
+        try:
+            events = client.get_recent_disclosures(symbol, name=name, days=45, max_count=10)
+            items.extend(event.to_dict() for event in events)
+        except Exception:
+            continue
+
+    items.sort(key=lambda x: str(x.get("ts") or ""), reverse=True)
+    items = items[:100]
+    _disclosure_cache["data"] = items
+    _disclosure_cache["expires"] = now + _DISCLOSURE_CACHE_SECONDS
+    return {"ok": True, "items": items[:limit], "enabled": True}
+
+
+@app.get("/ai-judgments")
+def ai_judgments(
+    limit: int = Query(30, ge=1, le=200),
+    symbol: Optional[str] = Query(None),
+) -> dict[str, Any]:
+    """Return persisted AI judgments from Snapshot history."""
+    url = os.getenv("NEON_DATABASE_URL")
+    if not url:
+        raise HTTPException(status_code=503, detail="snapshot database unavailable")
+    try:
+        with psycopg2.connect(url) as conn:
+            with conn.cursor() as cur:
+                if symbol:
+                    cur.execute(
+                        """
+                        select j.judgment_id, j.snapshot_id, j.symbol,
+                               j.provider, j.model, j.input_data, j.output_data,
+                               j.created_at, s.captured_at
+                        from ai_judgments j
+                        left join market_snapshots s on s.snapshot_id=j.snapshot_id
+                        where j.symbol=%s
+                        order by j.created_at desc
+                        limit %s
+                        """,
+                        (symbol, limit),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        select j.judgment_id, j.snapshot_id, j.symbol,
+                               j.provider, j.model, j.input_data, j.output_data,
+                               j.created_at, s.captured_at
+                        from ai_judgments j
+                        left join market_snapshots s on s.snapshot_id=j.snapshot_id
+                        order by j.created_at desc
+                        limit %s
+                        """,
+                        (limit,),
+                    )
+                rows = cur.fetchall()
+
+        items = []
+        for judgment_id, snapshot_id, symbol_code, provider, model, input_data, output_data, created_at, captured_at in rows:
+            inp = input_data or {}
+            out = output_data or {}
+            score = inp.get("score") or {}
+            opinion = score.get("opinion") or out.get("opinion")
+            total = score.get("total")
+            items.append({
+                "id": judgment_id,
+                "snapshot_id": str(snapshot_id) if snapshot_id else None,
+                "symbol": symbol_code,
+                "name": SYMBOLS.get(symbol_code, symbol_code),
+                "provider": provider,
+                "model": model,
+                "score": total,
+                "opinion": opinion,
+                "comment": out.get("comment"),
+                "source": out.get("source"),
+                "created_at": created_at.isoformat() if created_at else None,
+                "captured_at": captured_at.isoformat() if captured_at else None,
+            })
+        return {"ok": True, "items": items}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"ai judgments unavailable: {exc}") from exc
 
 
 @app.get("/panic-watch")
