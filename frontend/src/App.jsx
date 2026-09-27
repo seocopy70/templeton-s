@@ -157,6 +157,71 @@ function signalLabel(signal) {
   }[signal] || "—";
 }
 
+function PanicWatch({ items }) {
+  const panicCount = items.filter((item) => item.panic_type && item.panic_type !== "none").length;
+
+  return (
+    <section className="section">
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">PANIC WATCH</span>
+          <h2>축적된 위험 신호</h2>
+        </div>
+        <span className="muted">
+          {items.length ? `최근 ${items.length}개 Snapshot · 활성 경보 ${panicCount}건` : "아직 축적된 Snapshot이 없습니다."}
+        </span>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="panel">
+          <p className="muted">자동 수집이 실행되면 여기에 시점별 시장 위험 신호가 쌓입니다.</p>
+        </div>
+      ) : (
+        <div className="panic-list">
+          {items.map((item) => {
+            const active = item.panic_type && item.panic_type !== "none";
+            const date = item.captured_at
+              ? new Date(item.captured_at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })
+              : "—";
+            const notable = (item.stocks || []).filter((stock) => {
+              const type = stock.panic?.type;
+              return type && type !== "none";
+            });
+
+            return (
+              <article className={`panic-row ${active ? "active" : ""}`} key={item.snapshot_id}>
+                <div className="panic-time">
+                  <strong>{date}</strong>
+                  <span>{item.market_regime || "—"}</span>
+                </div>
+                <div className="panic-main">
+                  <div className="panic-title">
+                    <span className={`panic-badge ${active ? "active" : "normal"}`}>
+                      {active ? item.panic_type : "정상"}
+                    </span>
+                    <span>{active ? `${notable.length}개 종목 위험 신호` : "특이 위험 신호 없음"}</span>
+                  </div>
+                  {notable.length > 0 && (
+                    <div className="panic-stocks">
+                      {notable.slice(0, 4).map((stock) => (
+                        <span key={stock.symbol}>{stock.name} · {stock.panic?.type || "—"}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="panic-market">
+                  <span>KODEX 200</span>
+                  <strong>{pct((item.stocks || []).find((stock) => stock.symbol === "069500")?.change_rate)}</strong>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function StockCard({ row, history, onLoadHistory }) {
   const score = row.score;
   const price = row;
@@ -218,6 +283,7 @@ function App() {
   const [rows, setRows] = useState([]);
   const [market, setMarket] = useState(null);
   const [decisions, setDecisions] = useState([]);
+  const [panicWatch, setPanicWatch] = useState([]);
   const [history, setHistory] = useState({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -265,6 +331,15 @@ function App() {
     }
   }, []);
 
+  const loadPanicWatch = useCallback(async () => {
+    try {
+      const data = await getJson("/panic-watch?limit=30");
+      setPanicWatch(data.items || []);
+    } catch {
+      setPanicWatch([]);
+    }
+  }, []);
+
   const loadHistory = useCallback(async (symbol) => {
     if (history[symbol]) return;
     try {
@@ -276,8 +351,8 @@ function App() {
   }, [history]);
 
   const refreshAll = useCallback(async (force = true) => {
-    await Promise.all([loadScores(force), loadMarket(), loadDecisions()]);
-  }, [loadScores, loadMarket, loadDecisions]);
+    await Promise.all([loadScores(force), loadMarket(), loadDecisions(), loadPanicWatch()]);
+  }, [loadScores, loadMarket, loadDecisions, loadPanicWatch]);
 
   useEffect(() => {
     refreshAll(false);
@@ -403,6 +478,8 @@ function App() {
             </div>
           )}
         </section>
+
+        <PanicWatch items={panicWatch} />
 
         <section className="section two-col">
           <div className="panel">
