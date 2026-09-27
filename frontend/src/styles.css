@@ -930,3 +930,71 @@ footer{margin-top:16px;padding-top:8px}
   .market-banner.compact-banner strong{font-size:14px}
   .watch-name b{font-size:11px}
 }
+
+
+/* 2026-09-27 mobile typography final correction */
+/* Narrow phones should not automatically use smaller type.
+   Give text the same readable scale as the wider layout and let vertical
+   space grow instead of compressing typography. */
+@media(max-width:700px){
+  .brand-line p{font-size:11px}
+  .connection{font-size:12px}
+  .refresh-button{font-size:12px;padding:6px 9px}
+
+  .hero{gap:10px}
+  .hero h2{font-size:21px}
+  .hero p{font-size:12px;line-height:1.4}
+  .hero-meta{font-size:12px}
+  .hero-meta strong{font-size:18px}
+
+  .view-nav button{font-size:12px;padding:7px 10px}
+  .metric span,.metric small{font-size:10px}
+  .compact-metrics .metric{padding:7px 4px}
+  .compact-metrics .metric strong{font-size:16px}
+
+  .market-banner.compact-banner{padding:7px 9px}
+  .market-banner.compact-banner > div .eyebrow{font-size:9px}
+  .market-banner.compact-banner > div strong{font-size:14px}
+  .market-banner.compact-banner > span{font-size:10px}
+
+  .section-heading h2{font-size:15px}
+  .section-heading.compact > div .eyebrow{font-size:9px}
+  .section-heading.compact > div h2{font-size:14px}
+
+  .live-market-head strong{font-size:13px}
+  .live-clock{font-size:10px}
+  .live-market-name{font-size:10px}
+  .live-market-card strong{font-size:13px}
+  .live-market-card span{font-size:10px}
+
+  .watch-name b{font-size:12px}
+  .watch-name small{font-size:9px}
+  .watch-price{font-size:12px}
+  .watch-change{font-size:10px}
+  .watch-score{font-size:10px;min-width:34px}
+
+  .risk-chip b{font-size:10px}
+  .risk-chip span{font-size:9px}
+  .risk-clear{font-size:10px}
+
+  .ai-head{font-size:11px}
+  .ai-comment{font-size:10px;line-height:1.5}
+  .ai-columns b{font-size:10px}
+  .ai-columns li,.ai-columns p{font-size:10px;line-height:1.4}
+  .ai-sub{font-size:10px;line-height:1.4}
+
+  .selected-detail{padding:8px 9px}
+  .selected-head h2{font-size:16px}
+  .selected-price{font-size:21px}
+  .selected-score strong{font-size:17px}
+  .selected-detail .score-chip span{font-size:9px}
+  .selected-detail .score-chip strong{font-size:10px}
+  .selected-chart .section-label{font-size:9px}
+  .selected-facts span{font-size:9px}
+
+  .details summary{font-size:11px}
+  .detail-grid span{font-size:9px}
+  .detail-grid strong{font-size:11px}
+  .small-note{font-size:10px}
+  footer{font-size:9px}
+}
