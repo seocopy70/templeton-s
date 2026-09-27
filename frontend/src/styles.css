@@ -754,3 +754,100 @@ footer{margin-top:16px;padding-top:8px}
     font-size:12px;
   }
 }
+
+/* 2026-09-27 selected stock readability + density */
+.selected-detail{
+  padding:10px 12px;
+}
+.selected-head h2{
+  font-size:19px;
+}
+.selected-price-row{
+  margin:6px 0;
+}
+.selected-price{
+  font-size:27px;
+}
+.selected-score{
+  padding:5px 9px;
+}
+.selected-score strong{
+  font-size:21px;
+}
+.selected-detail .score-strip{
+  gap:4px;
+  margin:5px 0 1px;
+}
+.selected-detail .score-chip{
+  padding:5px 3px 4px;
+}
+.selected-detail .score-chip span{
+  font-size:10px;
+  line-height:1.1;
+}
+.selected-detail .score-chip strong{
+  font-size:11px;
+  margin-top:3px;
+}
+.selected-chart{
+  margin-top:4px;
+  padding-top:5px;
+}
+.selected-chart .section-label{
+  font-size:10px;
+}
+.selected-chart .mini-chart{
+  height:48px;
+}
+.selected-facts{
+  gap:5px;
+  margin-top:5px;
+}
+.selected-facts span{
+  padding:4px 6px;
+  font-size:10px;
+}
+@media(max-width:700px){
+  .selected-detail{
+    padding:7px 8px;
+  }
+  .selected-head h2{
+    font-size:16px;
+  }
+  .selected-price-row{
+    margin:4px 0;
+  }
+  .selected-price{
+    font-size:22px;
+  }
+  .selected-score{
+    padding:4px 7px;
+  }
+  .selected-score strong{
+    font-size:17px;
+  }
+  .selected-detail .score-strip{
+    gap:2px;
+    margin:3px 0 0;
+  }
+  .selected-detail .score-chip{
+    padding:4px 1px 3px;
+  }
+  .selected-detail .score-chip span{
+    font-size:8px;
+  }
+  .selected-detail .score-chip strong{
+    font-size:9px;
+    margin-top:2px;
+  }
+  .selected-chart .section-label{
+    font-size:8px;
+  }
+  .selected-chart .mini-chart{
+    height:40px;
+  }
+  .selected-facts span{
+    padding:3px 5px;
+    font-size:8px;
+  }
+}
