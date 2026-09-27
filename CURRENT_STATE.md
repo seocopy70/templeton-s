@@ -4,7 +4,7 @@
 
 ## 현재 단계
 
-**Phase 2 — 새 React 버전 작성 단계**
+**Phase 2 — 새 React 버전 작성 단계 (1차 구현 완료, 빌드 검증 대기)**
 
 ## 가장 중요한 작업 기준
 
@@ -110,19 +110,34 @@ collection_run → market_snapshot → raw/context data + score
 
 지금은 모델 교체보다 데이터 수집 → Snapshot → Score → AI 판단 → Neon 기록의 안정화가 우선이다. provider/model/version을 교체 가능하게 보존하고, 충분한 데이터가 쌓인 뒤 동일 Snapshot 기반으로 모델을 비교한다.
 
+## 새 React 1차 구현 — 2026-09-27
+
+Streamlit `app.py`를 기능/화면 기준으로 삼아 기존 Oracle React와 분리된 새 Vite/React 구현을 `frontend/`에 작성했다.
+
+구성:
+- `frontend/App.jsx`: 현재 상태, 6종목, Templeton Score 6요소, 상세 입력값, 가격 History, 최근 판단, 데이터 상태
+- `frontend/styles.css`: 반응형 대시보드 UI
+- `frontend/main.jsx`, `index.html`, `vite.config.js`: 독립 Vite 실행 구조
+- 실제 FastAPI `/scores`, `/prices/{symbol}/history`, `/market-overview`, `/decisions` 연결
+- mock 주식 데이터 없음. API 실패 시 오류 상태를 표시
+- `/templeton/` public path를 새 Vite build의 base로 설정
+- 향후 AI/DART 상세 화면은 해당 데이터를 제공하는 API가 준비된 뒤 실제 데이터로 추가한다. 가짜 결과를 만들지 않는다.
+
+빌드 검증:
+- `.github/workflows/frontend-build.yml`을 추가하여 Node 22 + `npm install` + `npm run build` CI 검증 경로를 만들었다.
+- 현재 실행 환경에서는 외부 DNS가 차단되어 npm 패키지 설치를 통한 로컬 build 실행은 완료하지 못했다. 따라서 **코드 작성 완료와 CI 검증 경로 확보** 상태이며, 실제 build 성공 판정은 GitHub Actions 또는 Oracle에서 확인한다.
+
 ## 현재 알려진 문제
 
 기존 문서와 실제 작업본 사이에 차이가 있을 수 있으므로 실제 코드/서버 상태를 우선 확인한다.
 
 ## 다음 작업
 
-1. **정상 작동하는 Streamlit 화면과 기능을 다시 기준으로 삼아 새 React 구조를 설계한다.**
-2. 기존 Oracle React 코드를 복사/확장하지 않고 새 React 화면을 작성한다.
-3. 이미 검증된 FastAPI/KIS/Score API를 새 React에 연결한다.
-4. 새 React에서 실제 데이터를 표시하고 Streamlit과 핵심 결과를 대조한다.
-5. 새 React가 안정화되면 GitHub를 새 React의 기준본으로 확정한다.
-6. 그 build를 Oracle에 배포하여 기존 Oracle React 배포본을 덮어쓴다.
-7. 이후 자동 수집/AI 판단/운영 개선을 단계적으로 연결한다.
+1. GitHub Actions 또는 Oracle에서 새 `frontend/`의 실제 `npm run build` 성공을 확인한다.
+2. 새 React를 Oracle의 별도 경로/임시 build로 올려 실제 API와 브라우저에서 검증한다. 기존 Oracle React는 아직 덮어쓰지 않는다.
+3. Streamlit과 새 React의 핵심 수치/화면을 대조하여 누락 기능을 보완한다.
+4. 검증이 끝난 새 React build를 Oracle의 기존 React 배포본에 덮어쓴다.
+5. 이후 자동 수집/AI 판단/운영 개선을 단계적으로 연결한다.
 
 ## 기록 원칙
 
