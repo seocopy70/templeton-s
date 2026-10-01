@@ -639,6 +639,7 @@ function App() {
       // 성공한 live /scores를 이후의 snapshot 응답보다 우선한다.
       liveScoresLoadedRef.current = true;
       const ordered = [...data].sort((a, b) => {
+        const ai = WATCH_ORDER.indexOf(a.symbol);
         const bi = WATCH_ORDER.indexOf(b.symbol);
         return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi);
       });
