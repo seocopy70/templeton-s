@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "/templeton-api").replace(/\/$/, "");
 const SCORE_KEYS = ["value", "price", "pessimism", "quality", "growth", "risk"];
@@ -10,7 +10,7 @@ const SCORE_LABELS = {
   growth: "성장",
   risk: "위험",
 };
-const WATCH_ORDER = ["005930", "005380", "105560", "069500", "472150", "360750"];
+const WATCH_ORDER = ["005930", "000660", "005380", "105560", "373220", "012450", "034020", "207940", "005490", "069500", "472150", "360750"];
 
 const number = (value, digits = 1) => {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return "—";
@@ -610,11 +610,14 @@ function App() {
   const [showScores, setShowScores] = useState(true);
   const [selectedSymbol, setSelectedSymbol] = useState("전체");
   const [activeView, setActiveView] = useState("dashboard");
+  const liveScoresLoadedRef = useRef(false);
 
   const loadLatestSnapshot = useCallback(async () => {
     try {
       const data = await getJson("/latest-snapshot");
       if (Array.isArray(data.items) && data.items.length > 0) {
+        // /scores가 이미 성공했다면 오래된 snapshot이 최신 데이터를 덮어쓰지 않게 한다.
+        if (liveScoresLoadedRef.current) return;
         const ordered = [...data.items].sort((a, b) => {
           const ai = WATCH_ORDER.indexOf(a.symbol);
           const bi = WATCH_ORDER.indexOf(b.symbol);
@@ -633,6 +636,8 @@ function App() {
     setRefreshing(true);
     try {
       const data = await getJson(`/scores${force ? "?force=true" : ""}`);
+      // 성공한 live /scores를 이후의 snapshot 응답보다 우선한다.
+      liveScoresLoadedRef.current = true;
       const ordered = [...data].sort((a, b) => {
         const ai = WATCH_ORDER.indexOf(a.symbol);
         const bi = WATCH_ORDER.indexOf(b.symbol);
@@ -798,52 +803,3 @@ function App() {
             <span>KODEX 200 {marketChange == null ? "—" : signed(marketChange) + "%"} · 상승 {upCount} · 하락 {downCount}</span>
           </section>
           <section className="metrics-grid compact-metrics">
-            <Metric label="조회 종목" value={`${validRows.length} / ${rows.length || 12}`} />
-            <Metric label="평균 Score" value={avgScore == null ? "—" : number(avgScore)} />
-            <Metric label="상승" value={`${upCount}개`} />
-            <Metric label="하락" value={`${downCount}개`} />
-          </section>
-          <MarketTicker items={marketLive || []} updatedAt={marketLiveAt} />
-          <section className="dashboard-main">
-            <WatchlistPanel rows={validRows} selectedSymbol={selectedSymbol === "전체" ? (validRows[0]?.symbol || "") : selectedSymbol} onSelect={setSelectedSymbol} />
-            <SelectedStockDetail row={validRows.find((r) => r.symbol === (selectedSymbol === "전체" ? validRows[0]?.symbol : selectedSymbol)) || validRows[0]} history={history[validRows.find((r) => r.symbol === (selectedSymbol === "전체" ? validRows[0]?.symbol : selectedSymbol))?.symbol]} judgment={decisions.find((d) => d.symbol === (selectedSymbol === "전체" ? validRows[0]?.symbol : selectedSymbol))} />
-          </section>
-          <RiskSignals rows={validRows} panicWatch={panicWatch} />
-        </>}
-        {activeView === "stocks" && <section className="section compact-section">
-          <div className="section-heading"><div><span className="eyebrow">WATCHLIST</span><h2>종목별 상세</h2></div>
-            <div className="controls"><select value={selectedSymbol} onChange={(e) => setSelectedSymbol(e.target.value)}><option value="전체">전체 종목</option>{rows.map((row) => <option value={row.symbol} key={row.symbol}>{row.name}</option>)}</select>
-              <label className="switch"><input type="checkbox" checked={showScores} onChange={(e) => setShowScores(e.target.checked)} /><span /> Score 그래프</label>
-            </div>
-          </div>
-          {loading ? <div className="loading-grid">{[1,2,3,4,5,6,7,8,9,10,11,12].map((x) => <div className="skeleton" key={x} />)}</div> : <div className="stock-grid compact-stock-grid">{visibleRows.map((row) => <StockCard key={row.symbol} row={row} history={history[row.symbol]} onLoadHistory={loadHistory} showScores={showScores} />)}</div>}
-        </section>}
-
-        {activeView === "history" && <>
-          <Disclosures items={disclosures} />
-          <PanicWatch items={panicWatch} />
-          <section className="section two-col compact-section">
-            <div className="panel"><div className="section-heading compact"><div><span className="eyebrow">RECENT DECISIONS</span><h2>최근 판단 기록</h2></div></div>
-              {decisions.length === 0 ? <p className="muted">저장된 판단 기록이 없거나 API에서 조회되지 않았습니다.</p> : <div className="decision-scroll"><div className="decision-list">{decisions.slice(0,10).map((item,index) => <div className="decision-row" key={item.id || item.ts || index}><div><strong>{item.name || item.symbol || "종목"}</strong><span>{item.symbol || "—"}</span></div><div><strong>{item.score ?? item.total ?? "—"}</strong><span>{item.opinion || "—"}</span></div><time>{item.created_at ? new Date(item.created_at).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}) : item.ts || item.timestamp || "—"}</time></div>)}</div></div>}
-            </div>
-            <div className="panel"><div className="section-heading compact"><div><span className="eyebrow">REFRESH</span><h2>조회 설정</h2></div></div><label className="switch"><input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} /><span /> 10분 자동 새로고침</label></div>
-          </section>
-        </>}
-
-        {activeView === "validation" && <>
-          <OutcomePanel outcomes={outcomes} />
-          <section className="section compact-section two-col"><div className="panel"><div className="section-heading compact"><div><span className="eyebrow">DATA STATUS</span><h2>데이터 상태</h2></div></div><div className="status-list"><div><span>API</span><strong className="status-ok">FastAPI 연결</strong></div><div><span>시장 데이터</span><strong>{market ? "수신 완료" : "조회 중"}</strong></div><div><span>KIS / Score</span><strong>{validRows.length ? "실데이터 수신" : "대기"}</strong></div><div><span>마지막 조회</span><strong>{lastUpdated ? lastUpdated.toLocaleTimeString("ko-KR") : snapshotAt ? new Date(snapshotAt).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "—"}</strong></div><div><span>자동 기록</span><strong>09:30 / 17:00 KST</strong></div></div></div></section>
-        </>}
-
-        <footer>
-          <span>Templeton S · Score v0.5</span>
-          <span>AI는 참모, 최종 결정은 사용자</span>
-        </footer>
-      </main>
-    </div>
-  );
-}
-
-export default function AppWithErrorBoundary() {
-  return <AppErrorBoundary><App /></AppErrorBoundary>;
-}
