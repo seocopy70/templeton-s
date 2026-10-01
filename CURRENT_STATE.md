@@ -214,3 +214,13 @@ Streamlit에서 확인된 기존 핵심 화면 중 React에 빠져 있던 영역
 - `WATCH_ORDER`를 현재 12종목 순서로 갱신.
 - 백엔드/API/Score 계산 로직은 변경하지 않음.
 - 다음 단계: Oracle에서 main pull → frontend build → 실제 화면에서 12/12 유지 확인.
+
+
+## 2026-10-01 구형 GitHub Actions 정리
+
+- Oracle 실제 운영 구조 확인: 평일 09:30/17:00 `snapshot_collect.py`, 18:30 `snapshot_outcomes.py`가 crontab에서 실행됨.
+- `templeton-api.service`는 Oracle :8001에서 상시 실행.
+- 현재 코드/문서 참조 검색 결과, 구형 GitHub Actions의 수집 스크립트/워크플로 참조는 확인되지 않음.
+- 중복/구형 데이터 수집 경로인 `.github/workflows/daily.yml`, `daily_log.yml`, `macro_data.yml` 삭제.
+- `frontend-build.yml`은 React 빌드 검사용으로 유지.
+- 현재 데이터 수집·AI 판단·Outcome 자동화는 Oracle cron을 기준으로 유지.
