@@ -206,3 +206,11 @@ Streamlit에서 확인된 기존 핵심 화면 중 React에 빠져 있던 영역
 - React 대시보드의 종목 수 기본값/로딩 표시를 12종목 기준으로 보정
 - 섹터 분류 및 섹터별 점수는 이번 작업에서 추가하지 않음; 추후 별도 작업
 - 다음 단계: GitHub Actions frontend build 확인 → Oracle pull/build → 실제 12종목 /scores 및 화면 검증
+
+## 2026-10-01 초기 로딩 race condition 수정
+
+- `latest-snapshot`과 `/scores`의 기존 동시 로딩 구조는 유지함.
+- live `/scores`가 한 번이라도 성공하면 늦게 도착한 오래된 snapshot이 `rows`를 덮어쓰지 않도록 React에 `useRef` 보호 로직 추가.
+- `WATCH_ORDER`를 현재 12종목 순서로 갱신.
+- 백엔드/API/Score 계산 로직은 변경하지 않음.
+- 다음 단계: Oracle에서 main pull → frontend build → 실제 화면에서 12/12 유지 확인.
