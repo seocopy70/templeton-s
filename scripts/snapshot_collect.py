@@ -38,7 +38,11 @@ from regime.opportunity_rank import rank_opportunities
 from ai_interpreter import get_coach, build_change_conditions
 
 KST = ZoneInfo("Asia/Seoul")
-DISPLAY_ORDER = ["005930", "005380", "105560", "069500", "472150", "360750"]
+DISPLAY_ORDER = [
+    "005930", "000660", "005380", "105560",
+    "373220", "012450", "034020", "207940", "005490",
+    "069500", "472150", "360750",
+]
 MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 PROVIDER = "groq"
 
