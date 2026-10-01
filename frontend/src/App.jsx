@@ -798,7 +798,7 @@ function App() {
             <span>KODEX 200 {marketChange == null ? "—" : signed(marketChange) + "%"} · 상승 {upCount} · 하락 {downCount}</span>
           </section>
           <section className="metrics-grid compact-metrics">
-            <Metric label="조회 종목" value={`${validRows.length} / ${rows.length || 6}`} />
+            <Metric label="조회 종목" value={`${validRows.length} / ${rows.length || 12}`} />
             <Metric label="평균 Score" value={avgScore == null ? "—" : number(avgScore)} />
             <Metric label="상승" value={`${upCount}개`} />
             <Metric label="하락" value={`${downCount}개`} />
@@ -816,7 +816,7 @@ function App() {
               <label className="switch"><input type="checkbox" checked={showScores} onChange={(e) => setShowScores(e.target.checked)} /><span /> Score 그래프</label>
             </div>
           </div>
-          {loading ? <div className="loading-grid">{[1,2,3,4,5,6].map((x) => <div className="skeleton" key={x} />)}</div> : <div className="stock-grid compact-stock-grid">{visibleRows.map((row) => <StockCard key={row.symbol} row={row} history={history[row.symbol]} onLoadHistory={loadHistory} showScores={showScores} />)}</div>}
+          {loading ? <div className="loading-grid">{[1,2,3,4,5,6,7,8,9,10,11,12].map((x) => <div className="skeleton" key={x} />)}</div> : <div className="stock-grid compact-stock-grid">{visibleRows.map((row) => <StockCard key={row.symbol} row={row} history={history[row.symbol]} onLoadHistory={loadHistory} showScores={showScores} />)}</div>}
         </section>}
 
         {activeView === "history" && <>
