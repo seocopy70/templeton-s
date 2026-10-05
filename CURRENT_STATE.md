@@ -234,3 +234,12 @@ Streamlit에서 확인된 기존 핵심 화면 중 React에 빠져 있던 영역
 - React WATCH_ORDER도 신규 종목을 포함하도록 갱신했다.
 - 기존 KIS/Score/API/Snapshot 계산 로직은 변경하지 않았다.
 - 다음 단계: GitHub Actions frontend build 확인 → Oracle pull/restart/build → 실제 /scores에서 신규 6종목 데이터 확인.
+
+
+## 2026-10-05 관심종목 패널 스크롤/높이 보정
+
+- 대시보드 좌측 관심종목 패널을 내부 스크롤 구조로 변경했다.
+- 데스크톱에서는 우측 선택 종목 상세와 같은 grid row 높이를 사용하도록 하여 두 패널의 외곽 높이를 맞췄다.
+- 좁은 화면에서는 관심종목 패널 높이를 최대 360px로 제한하고 내부 스크롤하도록 했다.
+- 종목 데이터/API/계산 로직은 변경하지 않았다.
+- 다음 단계: Oracle pull → frontend build → 브라우저에서 좌우 높이 및 관심종목 내부 스크롤 확인.
