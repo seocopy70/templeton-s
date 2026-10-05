@@ -252,3 +252,10 @@ Streamlit에서 확인된 기존 핵심 화면 중 React에 빠져 있던 영역
 - 우측 선택 종목 상세 패널은 자연 높이를 유지하도록 했다.
 - 모바일의 기존 최대 360px 제한은 유지했다.
 - 다음 단계: Oracle pull → frontend build → frontend 재시작 → PC에서 18개 관심종목 내부 스크롤 및 우측 상세 패널과의 높이 확인.
+
+
+## 2026-10-05 관심종목 PC 높이 3차 보정
+
+- PC 관심종목 패널 높이를 280px에서 450px로 늘렸다.
+- 모바일의 max-height 360px 제한은 그대로 유지한다.
+- 다음 단계: Oracle pull → frontend build → frontend 재시작 → PC에서 표시 종목 수 확인.
