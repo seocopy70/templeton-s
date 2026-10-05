@@ -224,3 +224,13 @@ Streamlit에서 확인된 기존 핵심 화면 중 React에 빠져 있던 영역
 - 중복/구형 데이터 수집 경로인 `.github/workflows/daily.yml`, `daily_log.yml`, `macro_data.yml` 삭제.
 - `frontend-build.yml`은 React 빌드 검사용으로 유지.
 - 현재 데이터 수집·AI 판단·Outcome 자동화는 Oracle cron을 기준으로 유지.
+
+
+## 2026-10-05 관심종목 6개 추가
+
+- 기존 12종목은 유지하고 LG전자(066570), 삼성물산(028260), NAVER(035420), 신한지주(055550), 우리금융지주(316140), LG화학(051910)을 추가했다.
+- SK하이닉스(000660)는 이미 기존 목록에 포함되어 있다.
+- 총 관심종목은 18종목으로 확장했다.
+- React WATCH_ORDER도 신규 종목을 포함하도록 갱신했다.
+- 기존 KIS/Score/API/Snapshot 계산 로직은 변경하지 않았다.
+- 다음 단계: GitHub Actions frontend build 확인 → Oracle pull/restart/build → 실제 /scores에서 신규 6종목 데이터 확인.
