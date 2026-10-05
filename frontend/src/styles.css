@@ -998,3 +998,32 @@ footer{margin-top:16px;padding-top:8px}
   .small-note{font-size:10px}
   footer{font-size:9px}
 }
+
+
+/* 2026-10-05 dashboard watchlist scroll / equal-height pass */
+.dashboard-main{
+  align-items:stretch;
+}
+.watch-panel{
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+  overflow:hidden;
+}
+.watch-list{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  scrollbar-width:thin;
+  scrollbar-color:#cbd5e1 transparent;
+}
+.watch-list::-webkit-scrollbar{width:7px}
+.watch-list::-webkit-scrollbar-track{background:transparent}
+.watch-list::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:99px}
+
+@media(max-width:820px){
+  .watch-panel{
+    max-height:360px;
+  }
+}
