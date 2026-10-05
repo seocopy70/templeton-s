@@ -1002,12 +1002,13 @@ footer{margin-top:16px;padding-top:8px}
 
 /* 2026-10-05 dashboard watchlist scroll / equal-height pass */
 .dashboard-main{
-  align-items:stretch;
+  align-items:start;
 }
 .watch-panel{
   display:flex;
   flex-direction:column;
   min-height:0;
+  height:280px;
   overflow:hidden;
 }
 .watch-list{
@@ -1021,9 +1022,13 @@ footer{margin-top:16px;padding-top:8px}
 .watch-list::-webkit-scrollbar{width:7px}
 .watch-list::-webkit-scrollbar-track{background:transparent}
 .watch-list::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:99px}
+.selected-detail{
+  align-self:start;
+}
 
 @media(max-width:820px){
   .watch-panel{
+    height:auto;
     max-height:360px;
   }
 }
