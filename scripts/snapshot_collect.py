@@ -32,9 +32,10 @@ from market_data import compute_volatility, compute_momentum
 from score_engine import calculate_templeton_score, MARKET_BENCHMARK_SYMBOL
 from events.trigger import should_refetch_events, trigger_reason
 from events.dart_client import DartClient
-from regime.market_regime import detect_market_regime
+from regime.market_regime import detect_market_regime, calc_drawdown, DD_WATCH_PCT, DD_WINDOW
 from regime.panic_classifier import classify_stock_panic
-from regime.opportunity_rank import rank_opportunities
+from regime.opportunity_rank import rank_opportunities, ETF_CODES
+from regime.entry_stage import decide_entry
 from ai_interpreter import get_coach, build_change_conditions
 
 KST = ZoneInfo("Asia/Seoul")
@@ -115,7 +116,12 @@ def main() -> int:
 
         client = KISClient()
         benchmark = client.get_current_price(MARKET_BENCHMARK_SYMBOL)
-        benchmark_closes = client.get_daily_closes(MARKET_BENCHMARK_SYMBOL, 10)
+        benchmark_closes = client.get_daily_closes(MARKET_BENCHMARK_SYMBOL, DD_WINDOW)
+        bench_dd = calc_drawdown(benchmark_closes, benchmark.get("current_price"))
+        # 시장이 고점 대비 충분히 눌린 구간이면 소폭 변동이어도 공시를 조회한다
+        # (그렇지 않으면 '악재 공시 미확인'이 실제로는 '미조회'인 채로 남는다)
+        force_events = bench_dd is not None and bench_dd <= DD_WATCH_PCT
+        print(f"[snapshot] benchmark drawdown={bench_dd} force_events={force_events}")
 
         results = []
         for name, code in build_watchlist():
@@ -145,16 +151,22 @@ def main() -> int:
                 mkt_chg = benchmark.get("change_rate")
                 need_events = should_refetch_events(change, mkt_chg)
                 trigger = trigger_reason(change, mkt_chg)
+                if force_events and code not in ETF_CODES and not need_events:
+                    need_events = True
+                    trigger = f"market_drawdown:{bench_dd:+.1f}%"
+                events_checked = False
                 if need_events and DART_API_KEY:
                     try:
                         dart = DartClient(DART_API_KEY)
                         events = [e.to_dict() for e in dart.get_recent_disclosures(code, name=name, days=30, max_count=5)]
+                        events_checked = True
                     except Exception as e:
                         print(f"[snapshot] DART {code}: {e}")
 
                 results.append({
                     "name": name, "code": code, "price": price, "closes": closes,
                     "financial": financial, "score": score, "events": events,
+                    "events_checked": events_checked,
                     "event_trigger": trigger if need_events else "none",
                     "volatility_annual": vol, "momentum_20d": mom,
                     "drop_from_52w_high": drop_52, "ok": True,
@@ -171,6 +183,7 @@ def main() -> int:
             benchmark_closes,
             [r["price"].get("change_rate") for r in results],
             benchmark_day_change=benchmark_chg,
+            benchmark_drawdown=bench_dd,
         )
         for r in results:
             r["panic"] = classify_stock_panic(
@@ -178,8 +191,29 @@ def main() -> int:
                 change_rate=r["price"].get("change_rate"),
                 market_change=benchmark_chg,
                 events=r["events"],
+                events_checked=r["events_checked"],
             )
         ranks = {x["code"]: x for x in rank_opportunities(results)}
+
+        # 분할매수 단계: 총점(75↑ 필요)과 별도로 '시장 낙폭 × 종목 낙폭 + 안전 게이트'로 판정.
+        # score["opinion"]을 덮어쓰면 API/사후검증(snapshot_outcomes)이 그대로 새 의견을 읽는다.
+        for r in results:
+            sc = r["score"]
+            ent = decide_entry(
+                code=r["code"],
+                base_opinion=sc.get("opinion") or "",
+                total_score=float(sc.get("total") or 0),
+                components=sc.get("components") or {},
+                market_dd=regime.drawdown_pct,
+                drop_from_52w_high=r.get("drop_from_52w_high"),
+                opportunity_score=(ranks.get(r["code"]) or {}).get("opportunity_score"),
+                panic_type=(r.get("panic") or {}).get("type") or "none",
+                events=r["events"],
+                events_checked=r["events_checked"],
+            )
+            sc["opinion_base"] = ent["opinion_base"]
+            sc["opinion"] = ent["opinion"]
+            sc["entry"] = ent
 
         coach = get_coach()
         market_data = {
@@ -187,6 +221,8 @@ def main() -> int:
             "benchmark": benchmark,
             "market_regime": regime.regime,
             "benchmark_change_rate": benchmark_chg,
+            "market_drawdown": regime.drawdown_pct,
+            "dd_stage": regime.dd_stage,
         }
         macro_data = fetch_fred_context()
         macro_data["captured_at_kst"] = now_kst.isoformat()
@@ -251,6 +287,7 @@ def main() -> int:
                 "negatives": ai.get("negatives") or [],
                 "counter_argument": ai.get("counter_argument"),
                 "change_conditions": conditions,
+                "source": ai.get("source"),   # groq | rule_based (폴백 여부를 기록)
                 "error": err,
             }
             input_data = {

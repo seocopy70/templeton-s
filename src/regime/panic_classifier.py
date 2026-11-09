@@ -10,6 +10,7 @@ def classify_stock_panic(
     change_rate: Optional[float],
     market_change: Optional[float],
     events: Optional[Sequence[dict]] = None,
+    events_checked: bool = True,
 ) -> dict[str, Any]:
     """
     Returns: {type, label_ko, reasons}
@@ -70,7 +71,9 @@ def classify_stock_panic(
     if change_rate is not None and change_rate < 0:
         reasons.append(f"시장 급락 동행 {change_rate:+.2f}%")
         if not events:
-            reasons.append("중요 악재 공시 미확인")
+            reasons.append(
+                "중요 악재 공시 미확인" if events_checked else "공시 미조회(소폭 변동)"
+            )
         return {
             "type": "panic_like",
             "label_ko": "공황형 후보",
