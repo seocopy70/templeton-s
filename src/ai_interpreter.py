@@ -104,9 +104,10 @@ def _build_fallback_comment(
     elif quality < 40:
         negatives.append(f"기업 질 우려 (Quality {quality:.0f})")
 
-    if risk <= 35:
+    # score_engine.calc_risk: 낮은 변동성 = 높은 점수 (높을수록 안정)
+    if risk >= 65:
         positives.append(f"변동성 안정 (Risk {risk:.0f})")
-    elif risk >= 65:
+    elif risk <= 35:
         negatives.append(f"변동성 확대 (Risk {risk:.0f})")
 
     if growth >= 60:
@@ -201,7 +202,7 @@ def build_change_conditions(
         conditions.append("실적 전망 -10% 이상 하향 시 밸류에이션 매력 약화")
     if _get_comp(components, "pessimism") >= 65:
         conditions.append("시장 심리 회복 조짐(뉴스/거래량) 보일 시 비관 점수 하락")
-    if _get_comp(components, "risk") >= 65:
+    if _get_comp(components, "risk") <= 35:
         conditions.append("변동성 축소 시 리스크 점수 개선 가능")
 
     conditions.append("주요 공시(실적, 유상증자, 자사주) 발생 시 즉시 재평가")
@@ -276,7 +277,7 @@ class AICoach:
 - Price (가격 매력): {price:.0f}
 - Pessimism (시장 비관): {pessimism:.0f}
 - Quality (기업 질): {quality:.0f}
-- Risk (위험): {risk:.0f}
+- Risk (변동성 안정도, 높을수록 안정): {risk:.0f}
 - Growth (성장): {growth:.0f}
 
 [시장 상황]

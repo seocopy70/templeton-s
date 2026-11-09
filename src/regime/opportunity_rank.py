@@ -29,10 +29,11 @@ def score_opportunity(row: dict[str, Any]) -> dict[str, Any]:
     """
     row keys: code, name, score_data, panic_type, price_data
     """
-    s = row.get("score_data") or {}
+    # app.py는 score_data/panic_class, snapshot_collect는 score/panic 키를 쓴다 → 둘 다 허용
+    s = row.get("score_data") or row.get("score") or {}
     components = s.get("components") or {}
     code = str(row.get("code") or "")
-    panic_type = (row.get("panic_class") or {}).get("type") or "none"
+    panic_type = (row.get("panic_class") or row.get("panic") or {}).get("type") or "none"
 
     value = _comp(components, "value")
     price = _comp(components, "price")
@@ -41,6 +42,8 @@ def score_opportunity(row: dict[str, Any]) -> dict[str, Any]:
 
     # 낙폭: price 매력과 고점 대비를 함께
     drop = (s.get("context") or {}).get("vs_52w_high")
+    if drop is None:
+        drop = row.get("drop_from_52w_high")   # snapshot_collect 경로
     try:
         drop_f = float(drop) if drop is not None else 0.0
     except (TypeError, ValueError):
@@ -59,7 +62,7 @@ def score_opportunity(row: dict[str, Any]) -> dict[str, Any]:
         + price * 0.20
         + quality * 0.15
         + drop_score * 0.15
-        + (100 - risk) * 0.10  # risk 높으면 감점
+        + risk * 0.10  # Risk 점수는 '높을수록 안정' → 변동성 큰 종목 감점
     )
 
     if panic_type == "panic_like":
